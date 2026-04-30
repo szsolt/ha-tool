@@ -378,7 +378,16 @@ def restart(ctx: click.Context, confirm: bool) -> None:
             click.echo("Aborted.")
             return
 
-    run_with_error_handling(_call_service("homeassistant", "restart", verbose=ctx.obj["verbose"]))
+    try:
+        asyncio.run(_call_service("homeassistant", "restart", verbose=ctx.obj["verbose"]))
+    except ConnectionError:
+        pass
+    except PermissionError as e:
+        click.echo(f"Authentication error: {e}", err=True)
+        sys.exit(1)
+    except RuntimeError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
 
     if ctx.obj["output"] == "json":
         output_json({"success": True, "action": "restart"})
@@ -400,6 +409,137 @@ def template(ctx: click.Context, template_str: str) -> None:
         output_json({"template": template_str, "result": result})
     else:
         click.echo(result)
+
+
+async def _check_config(verbose: bool = False) -> dict:
+    url, token = get_config()
+    async with HAWebSocketClient(url, token, verbose=verbose) as client:
+        return await client.check_config()
+
+
+@cli.command(name="check-config")
+@click.pass_context
+def check_config(ctx: click.Context) -> None:
+    """Validate Home Assistant configuration.yaml.
+
+    Calls the REST endpoint /api/config/core/check_config. Returns
+    {"result": "valid"|"invalid", "errors": ..., "warnings": ...}.
+    Exits with code 1 if invalid.
+    """
+    result = run_with_error_handling(_check_config(verbose=ctx.obj["verbose"]))
+    valid = isinstance(result, dict) and result.get("result") == "valid"
+
+    if ctx.obj["output"] == "json":
+        output_json(result)
+    else:
+        if valid:
+            click.echo("Configuration valid.")
+        else:
+            click.echo("Configuration INVALID.", err=True)
+            errors = result.get("errors") if isinstance(result, dict) else None
+            warnings = result.get("warnings") if isinstance(result, dict) else None
+            if errors:
+                click.echo(f"Errors:\n{errors}", err=True)
+            if warnings:
+                click.echo(f"Warnings:\n{warnings}", err=True)
+
+    if not valid:
+        sys.exit(1)
+
+
+async def _remove_entity(entity_id: str, verbose: bool = False) -> dict | None:
+    url, token = get_config()
+    async with HAWebSocketClient(url, token, verbose=verbose) as client:
+        return await client.remove_entity(entity_id)
+
+
+async def _remove_device(device_id: str, config_entry_id: str, verbose: bool = False) -> dict | None:
+    url, token = get_config()
+    async with HAWebSocketClient(url, token, verbose=verbose) as client:
+        return await client.remove_device(device_id, config_entry_id)
+
+
+async def _remove_config_entry(entry_id: str, verbose: bool = False) -> dict | None:
+    url, token = get_config()
+    async with HAWebSocketClient(url, token, verbose=verbose) as client:
+        return await client.remove_config_entry(entry_id)
+
+
+@cli.command(name="remove-entity")
+@click.argument("entity_id")
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt")
+@click.pass_context
+def remove_entity(ctx: click.Context, entity_id: str, yes: bool) -> None:
+    """Remove an entity from the entity registry.
+
+    Only works for entities without a unique_id constraint (e.g. helpers,
+    manually-added entities). Integration-provided entities must be removed
+    via their device or config entry.
+    """
+    if not yes and ctx.obj["output"] != "json":
+        if not click.confirm(f"Remove entity '{entity_id}'? This cannot be undone."):
+            click.echo("Aborted.")
+            return
+
+    run_with_error_handling(_remove_entity(entity_id, verbose=ctx.obj["verbose"]))
+
+    if ctx.obj["output"] == "json":
+        output_json({"success": True, "removed": entity_id})
+    else:
+        click.echo(f"Removed entity {entity_id}")
+
+
+@cli.command(name="remove-device")
+@click.argument("device_id")
+@click.argument("config_entry_id")
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt")
+@click.pass_context
+def remove_device(ctx: click.Context, device_id: str, config_entry_id: str, yes: bool) -> None:
+    """Disassociate a device from a config entry.
+
+    Device is removed when its last config entry association is removed.
+    DEVICE_ID and CONFIG_ENTRY_ID come from the device/config entry registries.
+    """
+    if not yes and ctx.obj["output"] != "json":
+        if not click.confirm(
+            f"Remove device '{device_id}' from config entry '{config_entry_id}'? This cannot be undone."
+        ):
+            click.echo("Aborted.")
+            return
+
+    run_with_error_handling(_remove_device(device_id, config_entry_id, verbose=ctx.obj["verbose"]))
+
+    if ctx.obj["output"] == "json":
+        output_json({"success": True, "removed_device": device_id, "config_entry_id": config_entry_id})
+    else:
+        click.echo(f"Removed device {device_id} from config entry {config_entry_id}")
+
+
+@cli.command(name="remove-config-entry")
+@click.argument("entry_id")
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt")
+@click.pass_context
+def remove_config_entry(ctx: click.Context, entry_id: str, yes: bool) -> None:
+    """Remove an integration config entry.
+
+    Removes the integration entry along with its associated devices and
+    entities. ENTRY_ID is the config entry's internal id.
+    """
+    if not yes and ctx.obj["output"] != "json":
+        if not click.confirm(
+            f"Remove config entry '{entry_id}'? This will delete the integration and its entities. This cannot be undone."
+        ):
+            click.echo("Aborted.")
+            return
+
+    result = run_with_error_handling(_remove_config_entry(entry_id, verbose=ctx.obj["verbose"]))
+
+    if ctx.obj["output"] == "json":
+        output_json({"success": True, "removed_entry": entry_id, "result": result})
+    else:
+        click.echo(f"Removed config entry {entry_id}")
+        if result and isinstance(result, dict) and result.get("require_restart"):
+            click.echo("Restart required to complete removal.")
 
 
 def main() -> None:

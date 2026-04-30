@@ -157,6 +157,55 @@ Restart Home Assistant. Requires confirmation unless `--confirm` / `-y` is passe
 ha-tool restart -y
 ```
 
+### remove-entity
+
+```bash
+ha-tool -o json remove-entity <entity_id> [--yes]
+```
+
+Remove an entity from the entity registry. Only works for entities without a unique_id constraint (helpers, manually-added entities). Integration-provided entities must be removed via their device or config entry. Prompts for confirmation unless `--yes` / `-y`.
+
+```bash
+ha-tool remove-entity input_boolean.test_toggle -y
+```
+
+### remove-device
+
+```bash
+ha-tool -o json remove-device <device_id> <config_entry_id> [--yes]
+```
+
+Disassociate a device from a config entry. The device is fully removed when its last config entry association is removed. Prompts for confirmation unless `--yes` / `-y`.
+
+```bash
+ha-tool remove-device abc123def456 zwave_js_entry_id -y
+```
+
+### remove-config-entry
+
+```bash
+ha-tool -o json remove-config-entry <entry_id> [--yes]
+```
+
+Remove an integration config entry along with its associated devices and entities. Some integrations require a Home Assistant restart to fully unload — the JSON output includes `require_restart` when so. Prompts for confirmation unless `--yes` / `-y`.
+
+```bash
+ha-tool remove-config-entry 01HXY7Z8ABCDEF -y
+```
+
+### check-config
+
+```bash
+ha-tool -o json check-config
+```
+
+Validate the Home Assistant `configuration.yaml`. Calls the REST endpoint `/api/config/core/check_config`. Returns `{result: "valid"|"invalid", errors: string|null, warnings: string|null}`. Exits with code 1 when invalid.
+
+```bash
+ha-tool check-config
+ha-tool -o json check-config
+```
+
 ### template
 
 ```bash

@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+import urllib.error
+import urllib.request
 from typing import Any
 
 from websockets.asyncio.client import connect
@@ -12,6 +14,7 @@ from websockets.exceptions import ConnectionClosed, InvalidURI
 class HAWebSocketClient:
     def __init__(self, url: str, token: str, verbose: bool = False) -> None:
         self._url = self._normalize_url(url)
+        self._http_base = self._http_base_url(url)
         self._token = token
         self._verbose = verbose
         self._ws: Any = None
@@ -33,6 +36,21 @@ class HAWebSocketClient:
         if url.endswith("/api"):
             return url + "/websocket"
         return url + "/api/websocket"
+
+    @staticmethod
+    def _http_base_url(url: str) -> str:
+        url = url.rstrip("/")
+        if url.startswith("ws://"):
+            url = "http://" + url[len("ws://"):]
+        elif url.startswith("wss://"):
+            url = "https://" + url[len("wss://"):]
+        elif not url.startswith("http"):
+            url = "http://" + url
+        for suffix in ("/api/websocket", "/api"):
+            if url.endswith(suffix):
+                url = url[: -len(suffix)]
+                break
+        return url
 
     def _log(self, msg: str) -> None:
         if self._verbose:
@@ -167,6 +185,52 @@ class HAWebSocketClient:
         if target:
             kwargs["target"] = target
         return await self.send_command("call_service", **kwargs)
+
+    async def remove_entity(self, entity_id: str) -> dict | None:
+        return await self.send_command("config/entity_registry/remove", entity_id=entity_id)
+
+    async def remove_device(self, device_id: str, config_entry_id: str) -> dict | None:
+        return await self.send_command(
+            "config/device_registry/remove_config_entry",
+            device_id=device_id,
+            config_entry_id=config_entry_id,
+        )
+
+    async def remove_config_entry(self, entry_id: str) -> dict | None:
+        return await self.send_command("config_entries/remove", entry_id=entry_id)
+
+    async def check_config(self) -> dict:
+        """Validate configuration.yaml via REST POST /api/config/core/check_config.
+
+        Returns {"result": "valid"|"invalid", "errors": str|None, "warnings": str|None}.
+        """
+        url = f"{self._http_base}/api/config/core/check_config"
+        headers = {
+            "Authorization": f"Bearer {self._token}",
+            "Content-Type": "application/json",
+        }
+        self._log(f"POST {url}")
+        req = urllib.request.Request(url, data=b"", headers=headers, method="POST")
+
+        def _do() -> dict:
+            try:
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    return json.loads(resp.read().decode("utf-8"))
+            except urllib.error.HTTPError as e:
+                body = e.read().decode("utf-8", errors="replace")
+                if e.code == 401:
+                    raise PermissionError(
+                        f"Authentication failed (HTTP 401). Check HASS_TOKEN."
+                    ) from e
+                raise RuntimeError(
+                    f"check_config HTTP {e.code}: {body}"
+                ) from e
+            except urllib.error.URLError as e:
+                raise ConnectionError(
+                    f"Cannot reach {url}: {e.reason}"
+                ) from e
+
+        return await asyncio.to_thread(_do)
 
     async def render_template(self, template: str) -> str:
         """Render a Jinja2 template and return the result.
