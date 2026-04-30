@@ -15,6 +15,12 @@ ha-tool -o json areas                    # List areas
 ha-tool -o json domains                  # List entity domains
 ha-tool -o json integrations             # List integrations
 ha-tool -o json services [--domain X]    # List services
+ha-tool -o json info                     # Core config (version, location, units)
+ha-tool -o json panels                   # Registered UI panels
+ha-tool -o json config-entries [-d X]    # Integration config entries
+ha-tool -o json labels                   # Label registry
+ha-tool -o json floors                   # Floor registry
+ha-tool -o json categories <scope>       # Category registry (default scope: automation)
 ```
 
 ### Search & Inspect
@@ -32,13 +38,63 @@ ha-tool -o json call <domain.service> [--data JSON] [--target JSON]
 ha-tool -o json reload [domain|all]
 ha-tool -o json restart [--confirm]
 ha-tool -o json template '<jinja2>'
+ha-tool -o json check-config             # Validate configuration.yaml (exit 1 if invalid)
 ```
+
+### History & logs
+
+```bash
+ha-tool -o json history <entity_id> [--since 1h] [--until now] [--minimal]
+ha-tool -o json logbook [--since 1h] [--until now] [--entity X]
+ha-tool -o json error-log [-n LINES]
+```
+
+`--since` / `--until` accept relative (`1h`, `30m`, `5d`, `2w`), keywords (`now`, `today`, `yesterday`), or ISO 8601.
+
+### Diagnostics
+
+```bash
+ha-tool -o json health                   # System health snapshot per integration
+ha-tool -o json repairs [--include-ignored]
+ha-tool -o json notifications list
+ha-tool notifications dismiss <notification_id>
+```
+
+### Live event stream
+
+```bash
+ha-tool watch [--event-type X] [--entity X]   # NDJSON stream until Ctrl-C
+```
+
+`watch` always emits NDJSON (one JSON object per line) regardless of `-o`.
+
+### Calendar
+
+```bash
+ha-tool -o json calendars                                       # List calendar entities
+ha-tool -o json calendar <entity_id> [--start now] [--end 7d]   # Events in window
+```
+
+`--end` accepts a relative offset from `--start` (e.g. `7d`, `1w`), or an absolute ISO/keyword.
 
 ### Verify
 
 ```bash
 ha-tool -o json verify <file> [--missing-only]
 ```
+
+### Remove (destructive — prompts unless `-y`)
+
+```bash
+ha-tool -o json remove-entity <entity_id> [--yes]                       # Helpers / manual entities only
+ha-tool -o json remove-device <device_id> <config_entry_id> [--yes]     # Disassociate device from config entry
+ha-tool -o json remove-config-entry <entry_id> [--yes]                  # Remove integration + its entities
+```
+
+Notes:
+- `remove-entity` works only for entities without unique_id constraint (helpers, manual). Integration-provided entities must go via device or config entry.
+- HA has no direct device-remove API; `remove-device` removes one config-entry association — device deletes when last association removed.
+- `remove-config-entry` JSON result may contain `require_restart: true`.
 
 ## Examples
 
@@ -60,4 +116,16 @@ ha-tool reload automations
 
 # Render template
 ha-tool template '{{ states("sensor.temperature") }}'
+
+# State history of a sensor for last 6 hours
+ha-tool -o json history sensor.outdoor_temperature --since 6h --minimal
+
+# Recent activity for one entity
+ha-tool -o json logbook --since 30m -e light.kitchen
+
+# Tail error log
+ha-tool error-log -n 50
+
+# Live state-change stream filtered to one entity
+ha-tool watch -t state_changed -e light.kitchen
 ```

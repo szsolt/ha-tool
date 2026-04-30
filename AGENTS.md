@@ -206,6 +206,190 @@ ha-tool check-config
 ha-tool -o json check-config
 ```
 
+### info
+
+```bash
+ha-tool -o json info
+```
+
+Returns Home Assistant core configuration: `{version, location_name, latitude, longitude, elevation, time_zone, unit_system, components, config_dir, external_url, internal_url, currency, country, language, safe_mode, state}`.
+
+### panels
+
+```bash
+ha-tool -o json panels
+```
+
+Returns registered UI panels: `[{component_name, url_path, title, icon, require_admin, config_panel_domain}]`.
+
+### config-entries
+
+```bash
+ha-tool -o json config-entries [--domain DOMAIN]
+```
+
+Lists integration config entries. Returns `[{entry_id, domain, title, state, source, disabled_by, pref_disable_polling, pref_disable_new_entities, supports_options, supports_remove_device, supports_unload, reason}]`. The `--domain` / `-d` flag filters client-side by integration domain.
+
+```bash
+ha-tool config-entries -d zwave_js
+```
+
+### labels
+
+```bash
+ha-tool -o json labels
+```
+
+Returns configured labels: `[{label_id, name, color, icon, description}]`.
+
+### floors
+
+```bash
+ha-tool -o json floors
+```
+
+Returns configured floors: `[{floor_id, name, level, icon, aliases}]`.
+
+### categories
+
+```bash
+ha-tool -o json categories [SCOPE]
+```
+
+Lists categories for a scope. SCOPE defaults to `automation`; common values include `automation`, `script`, `scene`. Returns `[{category_id, scope, name, icon}]`.
+
+```bash
+ha-tool categories script
+```
+
+### history
+
+```bash
+ha-tool -o json history <entity_id> [--since 1h] [--until now] [--minimal]
+```
+
+State history of an entity over a time window. Returns `[{entity_id, state, last_changed, last_updated, attributes}]`.
+
+- `--since` / `--until` accept relative (`1h`, `30m`, `5d`, `2w`), keywords (`now`, `today`, `yesterday`), or ISO 8601.
+- `--minimal` strips attributes server-side for a smaller payload.
+
+```bash
+ha-tool history sensor.outdoor_temperature --since 6h
+ha-tool -o json history sensor.power --since today --minimal
+```
+
+### logbook
+
+```bash
+ha-tool -o json logbook [--since 1h] [--until now] [--entity ENTITY_ID]
+```
+
+Human-readable activity log. Returns `[{when, name, message, entity_id, domain, context_id, ...}]`.
+
+- `--since` / `--until` accept relative (`1h`, `30m`, `5d`), keywords (`now`, `today`, `yesterday`), or ISO 8601.
+- `--entity` / `-e` filters by entity_id; repeat for multiple entities.
+
+```bash
+ha-tool logbook --since 30m
+ha-tool logbook --since today -e light.kitchen
+```
+
+### error-log
+
+```bash
+ha-tool -o json error-log [--lines N]
+```
+
+Fetch Home Assistant's error log via REST `/api/error_log` (plaintext). With `-o json`, returns `{log: "..."}`. With `--lines` / `-n N`, tail to the last N lines.
+
+```bash
+ha-tool error-log -n 50
+ha-tool -o json error-log -n 5
+```
+
+### health
+
+```bash
+ha-tool -o json health
+```
+
+System health snapshot per integration. Returns `{domain: {info_key: value, ...}}` — exact info varies per integration (e.g. version, can_reach_server, observer status).
+
+```bash
+ha-tool health
+```
+
+### repairs
+
+```bash
+ha-tool -o json repairs [--include-ignored]
+```
+
+Lists active repair issues. Returns `[{issue_id, domain, severity, breaks_in_ha_version, created, is_fixable, is_persistent, learn_more_url, translation_key, translation_placeholders, ignored, dismissed_version}]`. Ignored issues are filtered out by default.
+
+```bash
+ha-tool repairs
+```
+
+### notifications
+
+```bash
+ha-tool -o json notifications list
+ha-tool notifications dismiss <notification_id>
+```
+
+List or dismiss persistent notifications.
+
+- `list` — Returns `[{notification_id, title, message, created_at, status}]`.
+- `dismiss <notification_id>` — Dismisses a notification via the `persistent_notification.dismiss` service.
+
+```bash
+ha-tool notifications list
+ha-tool notifications dismiss config_entry_setup_failed
+```
+
+### watch
+
+```bash
+ha-tool watch [--event-type EVENT] [--entity ENTITY_ID]
+```
+
+Stream Home Assistant events as NDJSON (one JSON object per line) until interrupted with Ctrl-C. Output is always NDJSON regardless of `-o`.
+
+- `--event-type` / `-t` filters at subscription time (e.g. `state_changed`).
+- `--entity` / `-e` filters client-side by entity_id.
+
+```bash
+ha-tool watch --event-type state_changed
+ha-tool watch -t state_changed -e light.kitchen
+```
+
+### calendars
+
+```bash
+ha-tool -o json calendars
+```
+
+Lists available calendar entities (REST `/api/calendars`). Returns `[{entity_id, name}]`.
+
+### calendar
+
+```bash
+ha-tool -o json calendar <entity_id> [--start now] [--end 7d]
+```
+
+Returns events for a calendar entity over a time window (REST `/api/calendars/<entity_id>?start=&end=`).
+
+- `--start` accepts relative (`1h`, `today`, `now`), ISO 8601, or keyword.
+- `--end` accepts a relative duration (offset from start, e.g. `7d`, `1w`), ISO 8601, or keyword.
+
+Returns `[{start, end, summary, description, location, uid, recurrence_id}]`. `start` / `end` are typically `{date}` (all-day) or `{dateTime}` (timed).
+
+```bash
+ha-tool calendar calendar.holidays --start now --end 7d
+ha-tool -o json calendar calendar.work --start today --end 30d
+```
+
 ### template
 
 ```bash

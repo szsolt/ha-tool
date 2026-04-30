@@ -171,6 +171,55 @@ class HAWebSocketClient:
     async def get_services(self) -> dict:
         return await self.send_command("get_services")
 
+    async def get_core_config(self) -> dict:
+        return await self.send_command("get_config")
+
+    async def get_panels(self) -> dict:
+        return await self.send_command("get_panels")
+
+    async def get_config_entries(self) -> list[dict]:
+        return await self.send_command("config_entries/get")
+
+    async def get_label_registry(self) -> list[dict]:
+        return await self.send_command("config/label_registry/list")
+
+    async def get_floor_registry(self) -> list[dict]:
+        return await self.send_command("config/floor_registry/list")
+
+    async def get_category_registry(self, scope: str) -> list[dict]:
+        return await self.send_command("config/category_registry/list", scope=scope)
+
+    async def history_during_period(
+        self,
+        entity_ids: list[str],
+        start_time: str,
+        end_time: str | None = None,
+        minimal_response: bool = False,
+        no_attributes: bool = False,
+    ) -> dict:
+        payload: dict[str, Any] = {
+            "entity_ids": entity_ids,
+            "start_time": start_time,
+            "minimal_response": minimal_response,
+            "no_attributes": no_attributes,
+        }
+        if end_time:
+            payload["end_time"] = end_time
+        return await self.send_command("history/history_during_period", **payload)
+
+    async def logbook(
+        self,
+        start_time: str,
+        end_time: str | None = None,
+        entity_ids: list[str] | None = None,
+    ) -> list[dict]:
+        payload: dict[str, Any] = {"start_time": start_time}
+        if end_time:
+            payload["end_time"] = end_time
+        if entity_ids:
+            payload["entity_ids"] = entity_ids
+        return await self.send_command("logbook/get_events", **payload)
+
     async def call_service(
         self,
         domain: str,
@@ -231,6 +280,174 @@ class HAWebSocketClient:
                 ) from e
 
         return await asyncio.to_thread(_do)
+
+    async def error_log(self) -> str:
+        """Fetch full error log via REST GET /api/error_log (plaintext)."""
+        url = f"{self._http_base}/api/error_log"
+        headers = {"Authorization": f"Bearer {self._token}"}
+        self._log(f"GET {url}")
+        req = urllib.request.Request(url, headers=headers, method="GET")
+
+        def _do() -> str:
+            try:
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    return resp.read().decode("utf-8", errors="replace")
+            except urllib.error.HTTPError as e:
+                body = e.read().decode("utf-8", errors="replace")
+                if e.code == 401:
+                    raise PermissionError("Authentication failed (HTTP 401). Check HASS_TOKEN.") from e
+                raise RuntimeError(f"error_log HTTP {e.code}: {body}") from e
+            except urllib.error.URLError as e:
+                raise ConnectionError(f"Cannot reach {url}: {e.reason}") from e
+
+        return await asyncio.to_thread(_do)
+
+    async def list_calendars(self) -> list[dict]:
+        """REST GET /api/calendars."""
+        url = f"{self._http_base}/api/calendars"
+        headers = {"Authorization": f"Bearer {self._token}"}
+        self._log(f"GET {url}")
+        req = urllib.request.Request(url, headers=headers, method="GET")
+
+        def _do() -> list[dict]:
+            try:
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    return json.loads(resp.read().decode("utf-8"))
+            except urllib.error.HTTPError as e:
+                body = e.read().decode("utf-8", errors="replace")
+                if e.code == 401:
+                    raise PermissionError("Authentication failed (HTTP 401). Check HASS_TOKEN.") from e
+                raise RuntimeError(f"calendars HTTP {e.code}: {body}") from e
+            except urllib.error.URLError as e:
+                raise ConnectionError(f"Cannot reach {url}: {e.reason}") from e
+
+        return await asyncio.to_thread(_do)
+
+    async def calendar_events(self, entity_id: str, start: str, end: str) -> list[dict]:
+        """REST GET /api/calendars/<entity_id>?start=&end= (ISO8601)."""
+        from urllib.parse import quote, urlencode
+        qs = urlencode({"start": start, "end": end})
+        url = f"{self._http_base}/api/calendars/{quote(entity_id, safe='')}?{qs}"
+        headers = {"Authorization": f"Bearer {self._token}"}
+        self._log(f"GET {url}")
+        req = urllib.request.Request(url, headers=headers, method="GET")
+
+        def _do() -> list[dict]:
+            try:
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    return json.loads(resp.read().decode("utf-8"))
+            except urllib.error.HTTPError as e:
+                body = e.read().decode("utf-8", errors="replace")
+                if e.code == 401:
+                    raise PermissionError("Authentication failed (HTTP 401). Check HASS_TOKEN.") from e
+                if e.code == 404:
+                    raise RuntimeError(f"Calendar entity not found: {entity_id}") from e
+                raise RuntimeError(f"calendar HTTP {e.code}: {body}") from e
+            except urllib.error.URLError as e:
+                raise ConnectionError(f"Cannot reach {url}: {e.reason}") from e
+
+        return await asyncio.to_thread(_do)
+
+    async def system_health_info(
+        self,
+        timeout: float = 30.0,
+        idle_timeout: float = 2.0,
+    ) -> dict[str, dict]:
+        """Collect system_health/info events.
+
+        HA emits a `result` success ack first, then one `event` per integration.
+        We wait for the ack, then drain events until `idle_timeout` seconds
+        elapse without a new event.
+
+        Returns mapping {domain: info_dict}.
+        """
+        msg_id = self._next_id()
+        payload = {"id": msg_id, "type": "system_health/info"}
+
+        queue: asyncio.Queue[Any] = asyncio.Queue()
+        self._pending[msg_id] = queue
+
+        self._log(f"Sending id={msg_id} type=system_health/info")
+        result: dict[str, dict] = {}
+        ack_seen = False
+        try:
+            await self._ws.send(json.dumps(payload))
+            loop = asyncio.get_running_loop()
+            deadline = loop.time() + timeout
+
+            while not ack_seen:
+                remaining = max(0.0, deadline - loop.time())
+                msg = await asyncio.wait_for(queue.get(), timeout=remaining)
+                if msg.get("type") == "result":
+                    if not msg.get("success", False):
+                        err = msg.get("error", {})
+                        raise RuntimeError(
+                            f"system_health/info failed: {err.get('code','?')} - {err.get('message','?')}"
+                        )
+                    ack_seen = True
+                elif msg.get("type") == "event":
+                    ev = msg.get("event", {})
+                    domain = ev.get("domain")
+                    info = ev.get("info") or {}
+                    if domain:
+                        result[domain] = info
+
+            while True:
+                try:
+                    msg = await asyncio.wait_for(queue.get(), timeout=idle_timeout)
+                except asyncio.TimeoutError:
+                    return result
+                if msg.get("type") == "event":
+                    ev = msg.get("event", {})
+                    domain = ev.get("domain")
+                    info = ev.get("info") or {}
+                    if domain:
+                        result[domain] = info
+        finally:
+            self._pending.pop(msg_id, None)
+
+    async def list_repairs(self) -> dict:
+        return await self.send_command("repairs/list_issues")
+
+    async def stream_events(self, event_type: str | None = None):
+        """Yield events from subscribe_events. Cancel to stop and unsubscribe."""
+        msg_id = self._next_id()
+        payload: dict[str, Any] = {"id": msg_id, "type": "subscribe_events"}
+        if event_type:
+            payload["event_type"] = event_type
+
+        queue: asyncio.Queue[Any] = asyncio.Queue()
+        self._pending[msg_id] = queue
+
+        self._log(f"Sending id={msg_id} type=subscribe_events event_type={event_type}")
+        try:
+            await self._ws.send(json.dumps(payload))
+
+            ack = await queue.get()
+            if not ack.get("success", False):
+                err = ack.get("error", {})
+                raise RuntimeError(
+                    f"subscribe_events failed: {err.get('code','?')} - {err.get('message','?')}"
+                )
+
+            while True:
+                msg = await queue.get()
+                if msg.get("type") == "event":
+                    yield msg.get("event") or {}
+        finally:
+            try:
+                unsub_id = self._next_id()
+                await self._ws.send(json.dumps({
+                    "id": unsub_id,
+                    "type": "unsubscribe_events",
+                    "subscription": msg_id,
+                }))
+            except Exception:
+                pass
+            self._pending.pop(msg_id, None)
+
+    async def get_notifications(self) -> list[dict]:
+        return await self.send_command("persistent_notification/get")
 
     async def render_template(self, template: str) -> str:
         """Render a Jinja2 template and return the result.

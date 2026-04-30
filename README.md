@@ -163,6 +163,65 @@ ha-tool verify -m automations.yaml
 
 Extracts all patterns matching `<known_domain>.<object_id>` from the given files, filters out known service names (e.g. `light.turn_on`), and checks each entity against the live HA instance.
 
+### Removal commands
+
+```bash
+ha-tool remove-entity input_boolean.test_toggle -y
+ha-tool remove-device <device_id> <config_entry_id> -y
+ha-tool remove-config-entry <entry_id> -y
+```
+
+Registry cleanup. Prompts for confirmation unless `-y` / `--yes`.
+
+### Validate config
+
+```bash
+ha-tool check-config
+```
+
+Validates `configuration.yaml` (exits 1 when invalid).
+
+### Discovery (extra)
+
+```bash
+ha-tool info             # core config (version, location, units)
+ha-tool panels           # registered UI panels
+ha-tool config-entries   # integrations and their config entries
+ha-tool labels           # label registry
+ha-tool floors           # floor registry
+ha-tool categories <scope>  # category registry (default scope: automation)
+```
+
+### History and logs
+
+```bash
+ha-tool history sensor.outdoor_temperature --since 6h
+ha-tool logbook --since 30m -e light.kitchen
+ha-tool error-log -n 50
+```
+
+`--since` / `--until` accept `1h`, `30m`, `2d`, `today`, `now`, or ISO 8601.
+
+### Diagnostics
+
+```bash
+ha-tool health           # system health snapshot per integration
+ha-tool repairs          # active repair issues
+ha-tool notifications list
+ha-tool notifications dismiss <notification_id>
+```
+
+### Live event stream and calendar
+
+```bash
+ha-tool watch --event-type state_changed
+ha-tool watch -t state_changed -e light.kitchen
+ha-tool calendars
+ha-tool calendar calendar.work --start now --end 7d
+```
+
+`watch` outputs NDJSON until Ctrl-C.
+
 ## Output formats
 
 Default output is a human-readable table. Use `-o json` for machine-parseable JSON:
