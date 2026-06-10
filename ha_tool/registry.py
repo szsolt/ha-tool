@@ -149,7 +149,7 @@ class EntityIndex:
         Returns (pattern, is_glob) — glob patterns match per-field,
         substring/regex patterns match against the concatenated searchable string.
         """
-        regex_meta = re.compile(r'(?<!\\)[\^$|+(){}\[\]]')
+        regex_meta = re.compile(r"(?<!\\)[\^$|+(){}\[\]]")
         if regex_meta.search(text):
             return re.compile(text, re.IGNORECASE), False
 
@@ -189,10 +189,14 @@ class EntityIndex:
                 continue
 
             resolved_area = self._resolve_area(eid)
-            if area_lower and (not resolved_area or area_lower not in resolved_area.lower()):
+            if area_lower and (
+                not resolved_area or area_lower not in resolved_area.lower()
+            ):
                 continue
 
-            if integration and (not reg or (reg.platform or "").lower() != integration.lower()):
+            if integration and (
+                not reg or (reg.platform or "").lower() != integration.lower()
+            ):
                 continue
 
             if text_matcher:
@@ -298,7 +302,9 @@ class EntityIndex:
                             name=fname,
                             description=fdata.get("description"),
                             required=fdata.get("required", False),
-                            example=str(fdata["example"]) if "example" in fdata else None,
+                            example=str(fdata["example"])
+                            if "example" in fdata
+                            else None,
                             selector=fdata.get("selector"),
                         )
                     )
@@ -315,7 +321,9 @@ class EntityIndex:
 
         return sorted(results, key=lambda s: f"{s.domain}.{s.service}")
 
-    def search_services(self, text: str | None = None, domain: str | None = None) -> list[ServiceInfo]:
+    def search_services(
+        self, text: str | None = None, domain: str | None = None
+    ) -> list[ServiceInfo]:
         all_services = self.list_services()
         if not text and not domain:
             return all_services
@@ -344,7 +352,9 @@ class EntityIndex:
     def extract_and_verify(self, filepath: str, content: str) -> list[EntityReference]:
         """Extract entity references from text and verify each against the registry."""
         domains = self.known_domains()
-        domain_alt = "|".join(re.escape(d) for d in sorted(domains, key=len, reverse=True))
+        domain_alt = "|".join(
+            re.escape(d) for d in sorted(domains, key=len, reverse=True)
+        )
         pattern = re.compile(rf"\b({domain_alt})\.[a-z][a-z0-9_]*\b")
 
         # Build set of known service names to exclude (e.g. light.turn_on)

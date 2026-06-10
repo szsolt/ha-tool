@@ -133,6 +133,21 @@ ha-tool reload scenes
 ha-tool reload all
 ```
 
+### Refresh Lovelace dashboards
+
+```bash
+# Discover all yaml-mode dashboards and refresh them + the default dashboard
+ha-tool lovelace-refresh
+
+# Refresh specific dashboards by url_path ("default" = the built-in dashboard)
+ha-tool lovelace-refresh lovelace
+ha-tool lovelace-refresh power default
+```
+
+Home Assistant caches parsed YAML-mode dashboards in memory, so replacing the
+file on disk is invisible to clients. This sends `lovelace/config` with
+`force: true` to re-read each dashboard from disk. Exits 1 if any refresh fails.
+
 ### Restart Home Assistant
 
 ```bash
@@ -250,10 +265,12 @@ ha-tool -v search "pool"
 
 ## For AI Agents
 
-See [AGENTS.md](AGENTS.md) for structured documentation optimized for AI agent consumption, including:
+The installable skill at [`skills/ha-tool.md`](skills/ha-tool.md) is structured documentation optimized for AI agent consumption, including:
 - Command reference with exact output schemas
 - Discovery workflow patterns
 - Common usage examples
+
+See [AGENTS.md](AGENTS.md) for guidance on extending or fixing the repo itself.
 
 ### Claude Code Integration
 

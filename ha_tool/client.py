@@ -41,9 +41,9 @@ class HAWebSocketClient:
     def _http_base_url(url: str) -> str:
         url = url.rstrip("/")
         if url.startswith("ws://"):
-            url = "http://" + url[len("ws://"):]
+            url = "http://" + url[len("ws://") :]
         elif url.startswith("wss://"):
-            url = "https://" + url[len("wss://"):]
+            url = "https://" + url[len("wss://") :]
         elif not url.startswith("http"):
             url = "http://" + url
         for suffix in ("/api/websocket", "/api"):
@@ -59,10 +59,10 @@ class HAWebSocketClient:
     async def __aenter__(self) -> HAWebSocketClient:
         self._log(f"Connecting to {self._url}")
         try:
-            self._ws = await connect(self._url, max_size=2**24)
+            self._ws = await connect(self._url, max_size=2**24, open_timeout=10)
         except InvalidURI as e:
             raise ConnectionError(f"Invalid WebSocket URL: {self._url} ({e})") from e
-        except OSError as e:
+        except (OSError, asyncio.TimeoutError, TimeoutError) as e:
             raise ConnectionError(
                 f"Cannot connect to {self._url}: {e}\n"
                 f"Check that HASS_URL is correct and Home Assistant is reachable."
@@ -127,7 +127,9 @@ class HAWebSocketClient:
         finally:
             for pending in self._pending.values():
                 if isinstance(pending, asyncio.Future) and not pending.done():
-                    pending.set_exception(ConnectionError("WebSocket connection closed unexpectedly"))
+                    pending.set_exception(
+                        ConnectionError("WebSocket connection closed unexpectedly")
+                    )
 
     def _next_id(self) -> int:
         self._msg_id += 1
@@ -236,7 +238,9 @@ class HAWebSocketClient:
         return await self.send_command("call_service", **kwargs)
 
     async def remove_entity(self, entity_id: str) -> dict | None:
-        return await self.send_command("config/entity_registry/remove", entity_id=entity_id)
+        return await self.send_command(
+            "config/entity_registry/remove", entity_id=entity_id
+        )
 
     async def remove_device(self, device_id: str, config_entry_id: str) -> dict | None:
         return await self.send_command(
@@ -269,15 +273,11 @@ class HAWebSocketClient:
                 body = e.read().decode("utf-8", errors="replace")
                 if e.code == 401:
                     raise PermissionError(
-                        f"Authentication failed (HTTP 401). Check HASS_TOKEN."
+                        "Authentication failed (HTTP 401). Check HASS_TOKEN."
                     ) from e
-                raise RuntimeError(
-                    f"check_config HTTP {e.code}: {body}"
-                ) from e
+                raise RuntimeError(f"check_config HTTP {e.code}: {body}") from e
             except urllib.error.URLError as e:
-                raise ConnectionError(
-                    f"Cannot reach {url}: {e.reason}"
-                ) from e
+                raise ConnectionError(f"Cannot reach {url}: {e.reason}") from e
 
         return await asyncio.to_thread(_do)
 
@@ -295,7 +295,9 @@ class HAWebSocketClient:
             except urllib.error.HTTPError as e:
                 body = e.read().decode("utf-8", errors="replace")
                 if e.code == 401:
-                    raise PermissionError("Authentication failed (HTTP 401). Check HASS_TOKEN.") from e
+                    raise PermissionError(
+                        "Authentication failed (HTTP 401). Check HASS_TOKEN."
+                    ) from e
                 raise RuntimeError(f"error_log HTTP {e.code}: {body}") from e
             except urllib.error.URLError as e:
                 raise ConnectionError(f"Cannot reach {url}: {e.reason}") from e
@@ -316,7 +318,9 @@ class HAWebSocketClient:
             except urllib.error.HTTPError as e:
                 body = e.read().decode("utf-8", errors="replace")
                 if e.code == 401:
-                    raise PermissionError("Authentication failed (HTTP 401). Check HASS_TOKEN.") from e
+                    raise PermissionError(
+                        "Authentication failed (HTTP 401). Check HASS_TOKEN."
+                    ) from e
                 raise RuntimeError(f"calendars HTTP {e.code}: {body}") from e
             except urllib.error.URLError as e:
                 raise ConnectionError(f"Cannot reach {url}: {e.reason}") from e
@@ -326,6 +330,7 @@ class HAWebSocketClient:
     async def calendar_events(self, entity_id: str, start: str, end: str) -> list[dict]:
         """REST GET /api/calendars/<entity_id>?start=&end= (ISO8601)."""
         from urllib.parse import quote, urlencode
+
         qs = urlencode({"start": start, "end": end})
         url = f"{self._http_base}/api/calendars/{quote(entity_id, safe='')}?{qs}"
         headers = {"Authorization": f"Bearer {self._token}"}
@@ -339,7 +344,9 @@ class HAWebSocketClient:
             except urllib.error.HTTPError as e:
                 body = e.read().decode("utf-8", errors="replace")
                 if e.code == 401:
-                    raise PermissionError("Authentication failed (HTTP 401). Check HASS_TOKEN.") from e
+                    raise PermissionError(
+                        "Authentication failed (HTTP 401). Check HASS_TOKEN."
+                    ) from e
                 if e.code == 404:
                     raise RuntimeError(f"Calendar entity not found: {entity_id}") from e
                 raise RuntimeError(f"calendar HTTP {e.code}: {body}") from e
@@ -437,11 +444,15 @@ class HAWebSocketClient:
         finally:
             try:
                 unsub_id = self._next_id()
-                await self._ws.send(json.dumps({
-                    "id": unsub_id,
-                    "type": "unsubscribe_events",
-                    "subscription": msg_id,
-                }))
+                await self._ws.send(
+                    json.dumps(
+                        {
+                            "id": unsub_id,
+                            "type": "unsubscribe_events",
+                            "subscription": msg_id,
+                        }
+                    )
+                )
             except Exception:
                 pass
             self._pending.pop(msg_id, None)
@@ -449,9 +460,26 @@ class HAWebSocketClient:
     async def get_notifications(self) -> list[dict]:
         return await self.send_command("persistent_notification/get")
 
+    async def list_lovelace_dashboards(self) -> list[dict]:
+        """List user-created Lovelace dashboards (lovelace/dashboards/list).
+
+        Each entry includes `url_path`, `mode` ("yaml" or "storage"), `title`,
+        etc. The built-in default dashboard is NOT included here.
+        """
+        return await self.send_command("lovelace/dashboards/list")
+
+    async def reload_lovelace_config(self, url_path: str | None) -> dict:
+        """Force Home Assistant to re-read a YAML-mode dashboard from disk.
+
+        Sends lovelace/config with force=true. `url_path=None` targets the
+        built-in default dashboard. Returns the freshly-parsed config dict on
+        success; raises RuntimeError if HA reports failure.
+        """
+        return await self.send_command("lovelace/config", url_path=url_path, force=True)
+
     async def render_template(self, template: str) -> str:
         """Render a Jinja2 template and return the result.
-        
+
         The render_template API is subscription-based: first we get a success ack,
         then an event message with the rendered result.
         """
@@ -465,20 +493,20 @@ class HAWebSocketClient:
         self._log(f"Sending id={msg_id} type=render_template")
         try:
             await self._ws.send(json.dumps(payload))
-            
+
             # Wait for the success acknowledgment (type=result)
             ack_msg = await queue.get()
-            
+
             if not ack_msg.get("success", False):
                 error = ack_msg.get("error", {})
                 raise RuntimeError(
                     f"Command 'render_template' failed: "
                     f"{error.get('code', '?')} - {error.get('message', '?')}"
                 )
-            
+
             # Wait for the event message with the result (type=event)
             event_msg = await queue.get()
-            
+
             # Extract the result from the event
             event = event_msg.get("event", {})
             return event.get("result", "")

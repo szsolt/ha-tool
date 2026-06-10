@@ -72,7 +72,7 @@ ha-tool/
 1. Add any new client methods to `client.py`
 2. Add Pydantic models to `models.py` if needed
 3. Add the CLI command to `cli.py`
-4. Update `AGENTS.md` with the command documentation
+4. Update `skills/ha-tool.md` with the command documentation (the installable skill is the source of truth for CLI usage; reinstall with `./scripts/install-skill.sh`)
 5. Update `README.md` usage section
 6. Add entry to `CHANGELOG.md`
 

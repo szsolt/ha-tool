@@ -30,7 +30,7 @@ def parse_time(value: str, *, now: datetime | None = None) -> datetime:
       - ISO 8601 absolute (e.g. "2026-04-30T12:00:00Z")
     """
     if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"Empty time value")
+        raise ValueError("Empty time value")
 
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     s = value.strip().lower()

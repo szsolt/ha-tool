@@ -18,7 +18,9 @@ def get_config() -> tuple[str, str]:
     token = os.environ.get("HASS_TOKEN", "")
     missing: list[str] = []
     if not url:
-        missing.append("HASS_SERVER  (e.g. export HASS_SERVER=http://homeassistant.local:8123)")
+        missing.append(
+            "HASS_SERVER  (e.g. export HASS_SERVER=http://homeassistant.local:8123)"
+        )
     if not token:
         missing.append("HASS_TOKEN   (Profile → Security → Long-Lived Access Tokens)")
     if missing:
@@ -29,7 +31,9 @@ def get_config() -> tuple[str, str]:
     return url, token
 
 
-async def build_index(include_services: bool = False, verbose: bool = False) -> EntityIndex:
+async def build_index(
+    include_services: bool = False, verbose: bool = False
+) -> EntityIndex:
     url, token = get_config()
     async with HAWebSocketClient(url, token, verbose=verbose) as client:
         states, entities, devices, areas, services = await client.fetch_all(
@@ -85,7 +89,13 @@ def run_with_error_handling(coro: Any) -> Any:
 
 @click.group()
 @click.version_option(__version__, prog_name="ha-tool")
-@click.option("--output", "-o", type=click.Choice(["human", "json"]), default="human", help="Output format")
+@click.option(
+    "--output",
+    "-o",
+    type=click.Choice(["human", "json"]),
+    default="human",
+    help="Output format",
+)
 @click.option("--verbose", "-v", is_flag=True, help="Show debug output on stderr")
 @click.pass_context
 def cli(ctx: click.Context, output: str, verbose: bool) -> None:
@@ -98,9 +108,15 @@ def cli(ctx: click.Context, output: str, verbose: bool) -> None:
 @cli.command()
 @click.argument("text", required=False)
 @click.option("--domain", "-d", help="Filter by domain (e.g. sensor, climate, light)")
-@click.option("--device-class", "-c", help="Filter by device_class (e.g. temperature, motion)")
+@click.option(
+    "--device-class", "-c", help="Filter by device_class (e.g. temperature, motion)"
+)
 @click.option("--area", "-a", help="Filter by area name (substring match)")
-@click.option("--integration", "-i", help="Filter by integration/platform (e.g. hue, zwave_js, mqtt)")
+@click.option(
+    "--integration",
+    "-i",
+    help="Filter by integration/platform (e.g. hue, zwave_js, mqtt)",
+)
 @click.option("--include-disabled", is_flag=True, help="Include disabled entities")
 @click.pass_context
 def search(
@@ -130,7 +146,18 @@ def search(
         output_json([r.model_dump(exclude_none=True) for r in results])
     else:
         rows = [r.model_dump() for r in results]
-        output_table(rows, ["entity_id", "friendly_name", "domain", "device_class", "area", "state", "platform"])
+        output_table(
+            rows,
+            [
+                "entity_id",
+                "friendly_name",
+                "domain",
+                "device_class",
+                "area",
+                "state",
+                "platform",
+            ],
+        )
 
 
 @cli.command()
@@ -185,7 +212,9 @@ def get(ctx: click.Context, entity_id: str) -> None:
     if ctx.obj["output"] == "json":
         output_json(result)
     else:
-        click.echo(f"{result['entity_id']}  {result['friendly_name'] or '—'}  {result['state']}")
+        click.echo(
+            f"{result['entity_id']}  {result['friendly_name'] or '—'}  {result['state']}"
+        )
 
 
 @cli.command()
@@ -212,7 +241,14 @@ def domains(ctx: click.Context) -> None:
     if ctx.obj["output"] == "json":
         output_json([d.model_dump() for d in result])
     else:
-        rows = [{"domain": d.domain, "count": d.entity_count, "examples": ", ".join(d.sample_entities)} for d in result]
+        rows = [
+            {
+                "domain": d.domain,
+                "count": d.entity_count,
+                "examples": ", ".join(d.sample_entities),
+            }
+            for d in result
+        ]
         output_table(rows, ["domain", "count", "examples"])
 
 
@@ -226,7 +262,14 @@ def integrations(ctx: click.Context) -> None:
     if ctx.obj["output"] == "json":
         output_json([i.model_dump() for i in result])
     else:
-        rows = [{"integration": i.integration, "count": i.entity_count, "examples": ", ".join(i.sample_entities)} for i in result]
+        rows = [
+            {
+                "integration": i.integration,
+                "count": i.entity_count,
+                "examples": ", ".join(i.sample_entities),
+            }
+            for i in result
+        ]
         output_table(rows, ["integration", "count", "examples"])
 
 
@@ -236,7 +279,9 @@ def integrations(ctx: click.Context) -> None:
 @click.pass_context
 def services(ctx: click.Context, text: str | None, domain: str | None) -> None:
     """List or search available service actions."""
-    index = run_with_error_handling(build_index(include_services=True, verbose=ctx.obj["verbose"]))
+    index = run_with_error_handling(
+        build_index(include_services=True, verbose=ctx.obj["verbose"])
+    )
     results = index.search_services(text=text, domain=domain)
 
     if ctx.obj["output"] == "json":
@@ -244,12 +289,14 @@ def services(ctx: click.Context, text: str | None, domain: str | None) -> None:
     else:
         rows: list[dict] = []
         for s in results:
-            rows.append({
-                "service": f"{s.domain}.{s.service}",
-                "name": s.name or "",
-                "description": s.description or "",
-                "fields": ", ".join(f.name for f in s.fields) if s.fields else "",
-            })
+            rows.append(
+                {
+                    "service": f"{s.domain}.{s.service}",
+                    "name": s.name or "",
+                    "description": s.description or "",
+                    "fields": ", ".join(f.name for f in s.fields) if s.fields else "",
+                }
+            )
         output_table(rows, ["service", "name", "description"])
 
 
@@ -294,15 +341,28 @@ async def _render_template(template: str, verbose: bool = False) -> str:
 @cli.command(name="call")
 @click.argument("service_name")
 @click.option("--data", "-d", "data_json", help="Service data as JSON object")
-@click.option("--target", "-t", "target_json", help="Target as JSON (entity_id, device_id, or area_id)")
+@click.option(
+    "--target",
+    "-t",
+    "target_json",
+    help="Target as JSON (entity_id, device_id, or area_id)",
+)
 @click.pass_context
-def call_service(ctx: click.Context, service_name: str, data_json: str | None, target_json: str | None) -> None:
+def call_service(
+    ctx: click.Context,
+    service_name: str,
+    data_json: str | None,
+    target_json: str | None,
+) -> None:
     """Call a Home Assistant service.
 
     SERVICE_NAME is in the format domain.service (e.g. light.turn_on, automation.reload).
     """
     if "." not in service_name:
-        click.echo(f"Invalid service name '{service_name}'. Expected format: domain.service", err=True)
+        click.echo(
+            f"Invalid service name '{service_name}'. Expected format: domain.service",
+            err=True,
+        )
         sys.exit(1)
 
     domain, service = service_name.split(".", 1)
@@ -324,7 +384,9 @@ def call_service(ctx: click.Context, service_name: str, data_json: str | None, t
             click.echo(f"Invalid JSON for --target: {e}", err=True)
             sys.exit(1)
 
-    result = run_with_error_handling(_call_service(domain, service, data, target, verbose=ctx.obj["verbose"]))
+    result = run_with_error_handling(
+        _call_service(domain, service, data, target, verbose=ctx.obj["verbose"])
+    )
 
     if ctx.obj["output"] == "json":
         output_json({"success": True, "service": service_name, "result": result})
@@ -354,19 +416,26 @@ def reload(ctx: click.Context, domain: str | None) -> None:
     domain = domain.lower().rstrip("s")  # Allow "automations" -> "automation"
 
     if domain == "all":
-        run_with_error_handling(_call_service("homeassistant", "reload_all", verbose=ctx.obj["verbose"]))
+        run_with_error_handling(
+            _call_service("homeassistant", "reload_all", verbose=ctx.obj["verbose"])
+        )
         if ctx.obj["output"] == "json":
             output_json({"success": True, "reloaded": "all"})
         else:
             click.echo("Reloaded all configuration")
     elif domain in RELOAD_DOMAINS:
-        run_with_error_handling(_call_service(domain, "reload", verbose=ctx.obj["verbose"]))
+        run_with_error_handling(
+            _call_service(domain, "reload", verbose=ctx.obj["verbose"])
+        )
         if ctx.obj["output"] == "json":
             output_json({"success": True, "reloaded": domain})
         else:
             click.echo(f"Reloaded {domain}")
     else:
-        click.echo(f"Unknown reload domain '{domain}'. Use 'ha-tool reload' to see options.", err=True)
+        click.echo(
+            f"Unknown reload domain '{domain}'. Use 'ha-tool reload' to see options.",
+            err=True,
+        )
         sys.exit(1)
 
 
@@ -381,7 +450,9 @@ def restart(ctx: click.Context, confirm: bool) -> None:
             return
 
     try:
-        asyncio.run(_call_service("homeassistant", "restart", verbose=ctx.obj["verbose"]))
+        asyncio.run(
+            _call_service("homeassistant", "restart", verbose=ctx.obj["verbose"])
+        )
     except ConnectionError:
         pass
     except PermissionError as e:
@@ -405,7 +476,9 @@ def template(ctx: click.Context, template_str: str) -> None:
 
     TEMPLATE_STR is a Jinja2 template string, e.g. '{{ states("sensor.temperature") }}'.
     """
-    result = run_with_error_handling(_render_template(template_str, verbose=ctx.obj["verbose"]))
+    result = run_with_error_handling(
+        _render_template(template_str, verbose=ctx.obj["verbose"])
+    )
 
     if ctx.obj["output"] == "json":
         output_json({"template": template_str, "result": result})
@@ -463,7 +536,9 @@ def panels(ctx: click.Context) -> None:
         output_json([p.model_dump(exclude_none=True) for p in items])
     else:
         rows = [p.model_dump() for p in items]
-        output_table(rows, ["url_path", "title", "component_name", "icon", "require_admin"])
+        output_table(
+            rows, ["url_path", "title", "component_name", "icon", "require_admin"]
+        )
 
 
 async def _get_config_entries(verbose: bool = False) -> list[dict]:
@@ -488,7 +563,9 @@ def config_entries(ctx: click.Context, domain: str | None) -> None:
         output_json([e.model_dump(exclude_none=True) for e in items])
     else:
         rows = [e.model_dump() for e in items]
-        output_table(rows, ["entry_id", "domain", "title", "state", "source", "disabled_by"])
+        output_table(
+            rows, ["entry_id", "domain", "title", "state", "source", "disabled_by"]
+        )
 
 
 async def _get_labels(verbose: bool = False) -> list[dict]:
@@ -504,12 +581,12 @@ def labels(ctx: click.Context) -> None:
     from ha_tool.models import Label
 
     raw = run_with_error_handling(_get_labels(verbose=ctx.obj["verbose"]))
-    items = [Label.model_validate(l) for l in (raw or [])]
+    items = [Label.model_validate(item) for item in (raw or [])]
 
     if ctx.obj["output"] == "json":
-        output_json([l.model_dump(exclude_none=True) for l in items])
+        output_json([item.model_dump(exclude_none=True) for item in items])
     else:
-        rows = [l.model_dump() for l in items]
+        rows = [item.model_dump() for item in items]
         output_table(rows, ["label_id", "name", "color", "icon", "description"])
 
 
@@ -568,7 +645,11 @@ async def _history(
     url, token = get_config()
     async with HAWebSocketClient(url, token, verbose=verbose) as client:
         return await client.history_during_period(
-            [entity_id], start, end, minimal_response=minimal, no_attributes=minimal,
+            [entity_id],
+            start,
+            end,
+            minimal_response=minimal,
+            no_attributes=minimal,
         )
 
 
@@ -578,7 +659,9 @@ async def _history(
 @click.option("--until", default="now", help="End time (now, ISO)")
 @click.option("--minimal", is_flag=True, help="Strip attributes for smaller payload")
 @click.pass_context
-def history(ctx: click.Context, entity_id: str, since: str, until: str, minimal: bool) -> None:
+def history(
+    ctx: click.Context, entity_id: str, since: str, until: str, minimal: bool
+) -> None:
     """Show state history of an entity over a time window."""
     from ha_tool.timeparse import parse_time
     from ha_tool.models import HistoryPoint
@@ -590,10 +673,15 @@ def history(ctx: click.Context, entity_id: str, since: str, until: str, minimal:
         click.echo(f"Invalid time: {e}", err=True)
         sys.exit(1)
 
-    raw = run_with_error_handling(_history(
-        entity_id, start_dt.isoformat(), end_dt.isoformat(), minimal,
-        verbose=ctx.obj["verbose"],
-    ))
+    raw = run_with_error_handling(
+        _history(
+            entity_id,
+            start_dt.isoformat(),
+            end_dt.isoformat(),
+            minimal,
+            verbose=ctx.obj["verbose"],
+        )
+    )
 
     series = (raw or {}).get(entity_id, [])
     from datetime import datetime, timezone
@@ -609,12 +697,14 @@ def history(ctx: click.Context, entity_id: str, since: str, until: str, minimal:
         if lu is not None:
             out["last_updated"] = (
                 datetime.fromtimestamp(lu, tz=timezone.utc).isoformat()
-                if isinstance(lu, (int, float)) else lu
+                if isinstance(lu, (int, float))
+                else lu
             )
         if lc is not None:
             out["last_changed"] = (
                 datetime.fromtimestamp(lc, tz=timezone.utc).isoformat()
-                if isinstance(lc, (int, float)) else lc
+                if isinstance(lc, (int, float))
+                else lc
             )
         return out
 
@@ -623,12 +713,18 @@ def history(ctx: click.Context, entity_id: str, since: str, until: str, minimal:
     if ctx.obj["output"] == "json":
         output_json([p.model_dump(exclude_none=True) for p in points])
     else:
-        rows = [{"when": p.last_changed or p.last_updated or "", "state": p.state or ""} for p in points]
+        rows = [
+            {"when": p.last_changed or p.last_updated or "", "state": p.state or ""}
+            for p in points
+        ]
         output_table(rows, ["when", "state"])
 
 
 async def _logbook(
-    start: str, end: str | None, entity_ids: list[str] | None, verbose: bool = False,
+    start: str,
+    end: str | None,
+    entity_ids: list[str] | None,
+    verbose: bool = False,
 ) -> list[dict]:
     url, token = get_config()
     async with HAWebSocketClient(url, token, verbose=verbose) as client:
@@ -638,9 +734,17 @@ async def _logbook(
 @cli.command()
 @click.option("--since", default="1h", help="Start time (1h, 30m, 2d, ISO, today)")
 @click.option("--until", default="now", help="End time")
-@click.option("--entity", "-e", "entity_ids", multiple=True, help="Filter by entity_id (repeatable)")
+@click.option(
+    "--entity",
+    "-e",
+    "entity_ids",
+    multiple=True,
+    help="Filter by entity_id (repeatable)",
+)
 @click.pass_context
-def logbook(ctx: click.Context, since: str, until: str, entity_ids: tuple[str, ...]) -> None:
+def logbook(
+    ctx: click.Context, since: str, until: str, entity_ids: tuple[str, ...]
+) -> None:
     """Show human-readable activity log."""
     from ha_tool.timeparse import parse_time
     from ha_tool.models import LogbookEntry
@@ -652,23 +756,28 @@ def logbook(ctx: click.Context, since: str, until: str, entity_ids: tuple[str, .
         click.echo(f"Invalid time: {e}", err=True)
         sys.exit(1)
 
-    raw = run_with_error_handling(_logbook(
-        start_dt.isoformat(),
-        end_dt.isoformat(),
-        list(entity_ids) if entity_ids else None,
-        verbose=ctx.obj["verbose"],
-    ))
+    raw = run_with_error_handling(
+        _logbook(
+            start_dt.isoformat(),
+            end_dt.isoformat(),
+            list(entity_ids) if entity_ids else None,
+            verbose=ctx.obj["verbose"],
+        )
+    )
     entries = [LogbookEntry.model_validate(e) for e in (raw or [])]
 
     if ctx.obj["output"] == "json":
         output_json([e.model_dump(exclude_none=True) for e in entries])
     else:
-        rows = [{
-            "when": str(e.when or ""),
-            "name": e.name or "",
-            "message": e.message or "",
-            "entity_id": e.entity_id or "",
-        } for e in entries]
+        rows = [
+            {
+                "when": str(e.when or ""),
+                "name": e.name or "",
+                "message": e.message or "",
+                "entity_id": e.entity_id or "",
+            }
+            for e in entries
+        ]
         output_table(rows, ["when", "name", "message", "entity_id"])
 
 
@@ -739,7 +848,10 @@ def repairs(ctx: click.Context, include_ignored: bool) -> None:
         output_json([i.model_dump(exclude_none=True) for i in items])
     else:
         rows = [i.model_dump() for i in items]
-        output_table(rows, ["issue_id", "domain", "severity", "breaks_in_ha_version", "is_fixable"])
+        output_table(
+            rows,
+            ["issue_id", "domain", "severity", "breaks_in_ha_version", "is_fixable"],
+        )
 
 
 async def _get_notifications(verbose: bool = False) -> list[dict]:
@@ -775,11 +887,14 @@ def notifications_list(ctx: click.Context) -> None:
 @click.pass_context
 def notifications_dismiss(ctx: click.Context, notification_id: str) -> None:
     """Dismiss a persistent notification."""
-    run_with_error_handling(_call_service(
-        "persistent_notification", "dismiss",
-        data={"notification_id": notification_id},
-        verbose=ctx.obj["verbose"],
-    ))
+    run_with_error_handling(
+        _call_service(
+            "persistent_notification",
+            "dismiss",
+            data={"notification_id": notification_id},
+            verbose=ctx.obj["verbose"],
+        )
+    )
     if ctx.obj["output"] == "json":
         output_json({"success": True, "dismissed": notification_id})
     else:
@@ -801,12 +916,17 @@ async def _watch(
                     continue
                 if isinstance(ent, list) and entity_id not in ent:
                     continue
-            click.echo(json.dumps({
-                "event_type": event.get("event_type"),
-                "time_fired": event.get("time_fired"),
-                "origin": event.get("origin"),
-                "data": data,
-            }, default=str))
+            click.echo(
+                json.dumps(
+                    {
+                        "event_type": event.get("event_type"),
+                        "time_fired": event.get("time_fired"),
+                        "origin": event.get("origin"),
+                        "data": data,
+                    },
+                    default=str,
+                )
+            )
 
 
 @cli.command()
@@ -837,7 +957,10 @@ async def _list_calendars(verbose: bool = False) -> list[dict]:
 
 
 async def _calendar_events(
-    entity_id: str, start: str, end: str, verbose: bool = False,
+    entity_id: str,
+    start: str,
+    end: str,
+    verbose: bool = False,
 ) -> list[dict]:
     url, token = get_config()
     async with HAWebSocketClient(url, token, verbose=verbose) as client:
@@ -858,7 +981,9 @@ def calendars(ctx: click.Context) -> None:
 @cli.command()
 @click.argument("entity_id")
 @click.option("--start", default="now", help="Start time (now, ISO, today)")
-@click.option("--end", default="7d", help="End time (relative offset from start, ISO, or keyword)")
+@click.option(
+    "--end", default="7d", help="End time (relative offset from start, ISO, or keyword)"
+)
 @click.pass_context
 def calendar(ctx: click.Context, entity_id: str, start: str, end: str) -> None:
     """Show calendar events for a calendar entity over a window."""
@@ -877,21 +1002,34 @@ def calendar(ctx: click.Context, entity_id: str, start: str, end: str) -> None:
         click.echo(f"Invalid time: {e}", err=True)
         sys.exit(1)
 
-    raw = run_with_error_handling(_calendar_events(
-        entity_id, start_dt.isoformat(), end_dt.isoformat(),
-        verbose=ctx.obj["verbose"],
-    ))
+    raw = run_with_error_handling(
+        _calendar_events(
+            entity_id,
+            start_dt.isoformat(),
+            end_dt.isoformat(),
+            verbose=ctx.obj["verbose"],
+        )
+    )
     items = [CalendarEvent.model_validate(e) for e in (raw or [])]
 
     if ctx.obj["output"] == "json":
         output_json([e.model_dump(exclude_none=True) for e in items])
     else:
-        rows = [{
-            "start": str((e.start or {}).get("dateTime") or (e.start or {}).get("date") or e.start or ""),
-            "end": str((e.end or {}).get("dateTime") or (e.end or {}).get("date") or e.end or ""),
-            "summary": e.summary or "",
-            "location": e.location or "",
-        } for e in items]
+
+        def _fmt(v: dict | str | None) -> str:
+            if isinstance(v, dict):
+                return str(v.get("dateTime") or v.get("date") or "")
+            return str(v or "")
+
+        rows = [
+            {
+                "start": _fmt(e.start),
+                "end": _fmt(e.end),
+                "summary": e.summary or "",
+                "location": e.location or "",
+            }
+            for e in items
+        ]
         output_table(rows, ["start", "end", "summary", "location"])
 
 
@@ -931,13 +1069,92 @@ def check_config(ctx: click.Context) -> None:
         sys.exit(1)
 
 
+async def _lovelace_refresh(
+    url_paths: tuple[str, ...],
+    verbose: bool = False,
+) -> list[dict]:
+    """Refresh YAML-mode Lovelace dashboards by forcing a re-read from disk.
+
+    With no explicit url_paths, discovers all yaml-mode dashboards via
+    lovelace/dashboards/list and also refreshes the built-in default
+    dashboard. The literal "default" refers to that null-path dashboard.
+
+    Returns a list of per-dashboard result dicts:
+    {"url_path": "default"|<path>, "success": bool, "error": str|None}.
+    """
+    url, token = get_config()
+    async with HAWebSocketClient(url, token, verbose=verbose) as client:
+        # Build the list of (label, ws_path) targets.
+        targets: list[tuple[str, str | None]] = []
+        if url_paths:
+            for p in url_paths:
+                targets.append(("default", None) if p == "default" else (p, p))
+        else:
+            dashboards = await client.list_lovelace_dashboards()
+            for d in dashboards:
+                if d.get("mode") == "yaml" and d.get("url_path"):
+                    path = d["url_path"]
+                    targets.append((path, path))
+            # Always include the built-in default dashboard.
+            targets.append(("default", None))
+
+        results: list[dict] = []
+        for label, ws_path in targets:
+            try:
+                await client.reload_lovelace_config(ws_path)
+                results.append({"url_path": label, "success": True, "error": None})
+            except RuntimeError as e:
+                results.append({"url_path": label, "success": False, "error": str(e)})
+        return results
+
+
+@cli.command(name="lovelace-refresh")
+@click.argument("url_paths", nargs=-1, required=False)
+@click.pass_context
+def lovelace_refresh(ctx: click.Context, url_paths: tuple[str, ...]) -> None:
+    """Reload YAML-mode Lovelace dashboards from disk into the server cache.
+
+    Home Assistant caches parsed YAML dashboards in memory; replacing the
+    file on disk is invisible to clients until the cache is refreshed. This
+    sends lovelace/config with force=true to re-read each dashboard.
+
+    With no arguments, discovers all yaml-mode dashboards and also refreshes
+    the built-in default dashboard. Pass explicit URL_PATHS to refresh
+    specific dashboards; use the literal "default" for the default dashboard.
+
+    Exits 1 if any dashboard fails to refresh.
+    """
+    results = run_with_error_handling(
+        _lovelace_refresh(url_paths, verbose=ctx.obj["verbose"])
+    )
+
+    if ctx.obj["output"] == "json":
+        output_json(results)
+    else:
+        for r in results:
+            mark = "✓" if r["success"] else "✗"
+            line = f"  {mark} {r['url_path']}"
+            if not r["success"] and r.get("error"):
+                line += f"  ({r['error']})"
+            click.echo(line)
+        ok = sum(1 for r in results if r["success"])
+        failed = len(results) - ok
+        click.echo("")
+        click.echo(f"Refreshed {ok} dashboard(s), {failed} failed.")
+
+    if any(not r["success"] for r in results):
+        sys.exit(1)
+
+
 async def _remove_entity(entity_id: str, verbose: bool = False) -> dict | None:
     url, token = get_config()
     async with HAWebSocketClient(url, token, verbose=verbose) as client:
         return await client.remove_entity(entity_id)
 
 
-async def _remove_device(device_id: str, config_entry_id: str, verbose: bool = False) -> dict | None:
+async def _remove_device(
+    device_id: str, config_entry_id: str, verbose: bool = False
+) -> dict | None:
     url, token = get_config()
     async with HAWebSocketClient(url, token, verbose=verbose) as client:
         return await client.remove_device(device_id, config_entry_id)
@@ -978,7 +1195,9 @@ def remove_entity(ctx: click.Context, entity_id: str, yes: bool) -> None:
 @click.argument("config_entry_id")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt")
 @click.pass_context
-def remove_device(ctx: click.Context, device_id: str, config_entry_id: str, yes: bool) -> None:
+def remove_device(
+    ctx: click.Context, device_id: str, config_entry_id: str, yes: bool
+) -> None:
     """Disassociate a device from a config entry.
 
     Device is removed when its last config entry association is removed.
@@ -991,10 +1210,18 @@ def remove_device(ctx: click.Context, device_id: str, config_entry_id: str, yes:
             click.echo("Aborted.")
             return
 
-    run_with_error_handling(_remove_device(device_id, config_entry_id, verbose=ctx.obj["verbose"]))
+    run_with_error_handling(
+        _remove_device(device_id, config_entry_id, verbose=ctx.obj["verbose"])
+    )
 
     if ctx.obj["output"] == "json":
-        output_json({"success": True, "removed_device": device_id, "config_entry_id": config_entry_id})
+        output_json(
+            {
+                "success": True,
+                "removed_device": device_id,
+                "config_entry_id": config_entry_id,
+            }
+        )
     else:
         click.echo(f"Removed device {device_id} from config entry {config_entry_id}")
 
@@ -1016,7 +1243,9 @@ def remove_config_entry(ctx: click.Context, entry_id: str, yes: bool) -> None:
             click.echo("Aborted.")
             return
 
-    result = run_with_error_handling(_remove_config_entry(entry_id, verbose=ctx.obj["verbose"]))
+    result = run_with_error_handling(
+        _remove_config_entry(entry_id, verbose=ctx.obj["verbose"])
+    )
 
     if ctx.obj["output"] == "json":
         output_json({"success": True, "removed_entry": entry_id, "result": result})
@@ -1032,7 +1261,14 @@ def main() -> None:
 
 @cli.command()
 @click.argument("files", nargs=-1, required=True, type=click.Path(exists=True))
-@click.option("--filter", "-f", "filter_mode", type=click.Choice(["all", "missing", "existing"]), default="all", help="Filter results")
+@click.option(
+    "--filter",
+    "-f",
+    "filter_mode",
+    type=click.Choice(["all", "missing", "existing"]),
+    default="all",
+    help="Filter results",
+)
 @click.pass_context
 def verify(ctx: click.Context, files: tuple[str, ...], filter_mode: str) -> None:
     """Verify entity references in files exist in Home Assistant.
@@ -1040,7 +1276,9 @@ def verify(ctx: click.Context, files: tuple[str, ...], filter_mode: str) -> None
     Extracts all entity patterns (e.g. sensor.pool_temp, light.kitchen)
     from the given files and checks each against the live HA instance.
     """
-    index = run_with_error_handling(build_index(include_services=True, verbose=ctx.obj["verbose"]))
+    index = run_with_error_handling(
+        build_index(include_services=True, verbose=ctx.obj["verbose"])
+    )
 
     all_refs: list[dict] = []
     for filepath in files:
@@ -1070,7 +1308,9 @@ def verify(ctx: click.Context, files: tuple[str, ...], filter_mode: str) -> None
             status = "✓" if ref["exists"] else "✗"
             name = ref.get("friendly_name", "")
             name_str = f"  ({name})" if name else ""
-            click.echo(f"  {status} {ref['file']}:{ref['line']}  {ref['entity_id']}{name_str}")
+            click.echo(
+                f"  {status} {ref['file']}:{ref['line']}  {ref['entity_id']}{name_str}"
+            )
 
         missing = sum(1 for r in all_refs if not r["exists"])
         found = sum(1 for r in all_refs if r["exists"])

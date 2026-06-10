@@ -32,7 +32,7 @@ ha-tool -o json search "kitchen"
 2. Add CLI command in `cli.py` using `@cli.command()` decorator
 3. Use `run_with_error_handling()` wrapper for async calls
 4. Support both human (`output_table`) and JSON (`output_json`) output
-5. Update `AGENTS.md` documentation
+5. Update `skills/ha-tool.md` (installable skill — source of truth for CLI usage docs)
 
 ### WebSocket API
 
@@ -78,5 +78,6 @@ ha-tool call light.turn_on --target '{"entity_id": "light.test"}'
 ## Documentation
 
 - `README.md` — User-facing documentation
-- `AGENTS.md` — AI agent documentation (command schemas, examples)
+- `skills/ha-tool.md` — Installable skill; source of truth for CLI command schemas and examples
+- `AGENTS.md` — Signpost for AI agents (points to CLAUDE.md / CONTRIBUTING.md / the skill)
 - `CONTRIBUTING.md` — Development setup and guidelines

@@ -26,10 +26,12 @@ ha-tool -o json categories <scope>       # Category registry (default scope: aut
 ### Search & Inspect
 
 ```bash
-ha-tool -o json search <text> [--domain X] [--device-class X] [--area X] [--integration X]
+ha-tool -o json search <text> [--domain X] [--device-class X] [--area X] [--integration X] [--include-disabled]
 ha-tool -o json inspect <entity_id> [entity_id ...]
 ha-tool -o json get <entity_id>
 ```
+
+`search` TEXT supports substring, glob (`*` `?`), and regex (`[0-9]`, `|`, etc.) patterns.
 
 ### Control
 
@@ -39,7 +41,10 @@ ha-tool -o json reload [domain|all]
 ha-tool -o json restart [--confirm]
 ha-tool -o json template '<jinja2>'
 ha-tool -o json check-config             # Validate configuration.yaml (exit 1 if invalid)
+ha-tool -o json lovelace-refresh [url_path ...]   # Reload YAML-mode dashboards from disk (exit 1 if any fail)
 ```
+
+`lovelace-refresh` with no arguments discovers all yaml-mode dashboards and also refreshes the built-in default dashboard. Pass explicit URL_PATHS to target specific dashboards; use the literal `default` for the default dashboard.
 
 ### History & logs
 
@@ -80,7 +85,7 @@ ha-tool -o json calendar <entity_id> [--start now] [--end 7d]   # Events in wind
 ### Verify
 
 ```bash
-ha-tool -o json verify <file> [--missing-only]
+ha-tool -o json verify <file> [--filter all|missing|existing]
 ```
 
 ### Remove (destructive — prompts unless `-y`)
