@@ -31,6 +31,18 @@ export HASS_SERVER=https://your-ha-instance:8123
 export HASS_TOKEN=your_long_lived_access_token
 ```
 
+## Git Hooks
+
+Install the pre-commit hook once after cloning:
+
+```bash
+./scripts/install-hooks.sh
+```
+
+It runs `scripts/check-docs.sh` on every commit, which fails if any CLI
+command is undocumented in `skills/ha-tool.md` or `CHANGELOG.md`, or if
+`ruff` / `mypy` complain. Run it by hand any time with `./scripts/check-docs.sh`.
+
 ## Code Style
 
 - Python 3.12+ with type hints

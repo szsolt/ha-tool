@@ -32,7 +32,8 @@ ha-tool -o json search "kitchen"
 2. Add CLI command in `cli.py` using `@cli.command()` decorator
 3. Use `run_with_error_handling()` wrapper for async calls
 4. Support both human (`output_table`) and JSON (`output_json`) output
-5. Update `skills/ha-tool.md` (installable skill — source of truth for CLI usage docs)
+5. Update `skills/ha-tool.md` (installable skill — source of truth for CLI usage docs) and add a `CHANGELOG.md` entry
+6. Run `./scripts/check-docs.sh` — the pre-commit hook fails if a command is undocumented or `ruff`/`mypy` complain
 
 ### WebSocket API
 
