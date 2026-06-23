@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `rename-entity` — Change an entity's `entity_id` in the entity registry (via `config/entity_registry/update` with `new_entity_id`). Works for integration-provided entities since the override is keyed by unique_id; handy after an integration rebuild re-assigns entity_ids and existing templates/config still point at the old ones.
+
 ## [0.3.0] - 2026-06-17
 
 ### Added

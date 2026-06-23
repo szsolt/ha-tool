@@ -242,6 +242,13 @@ class HAWebSocketClient:
             "config/entity_registry/remove", entity_id=entity_id
         )
 
+    async def rename_entity(self, entity_id: str, new_entity_id: str) -> dict | None:
+        return await self.send_command(
+            "config/entity_registry/update",
+            entity_id=entity_id,
+            new_entity_id=new_entity_id,
+        )
+
     async def remove_device(self, device_id: str, config_entry_id: str) -> dict | None:
         return await self.send_command(
             "config/device_registry/remove_config_entry",

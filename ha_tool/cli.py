@@ -1152,6 +1152,14 @@ async def _remove_entity(entity_id: str, verbose: bool = False) -> dict | None:
         return await client.remove_entity(entity_id)
 
 
+async def _rename_entity(
+    entity_id: str, new_entity_id: str, verbose: bool = False
+) -> dict | None:
+    url, token = get_config()
+    async with HAWebSocketClient(url, token, verbose=verbose) as client:
+        return await client.rename_entity(entity_id, new_entity_id)
+
+
 async def _remove_device(
     device_id: str, config_entry_id: str, verbose: bool = False
 ) -> dict | None:
@@ -1188,6 +1196,39 @@ def remove_entity(ctx: click.Context, entity_id: str, yes: bool) -> None:
         output_json({"success": True, "removed": entity_id})
     else:
         click.echo(f"Removed entity {entity_id}")
+
+
+@cli.command(name="rename-entity")
+@click.argument("entity_id")
+@click.argument("new_entity_id")
+@click.pass_context
+def rename_entity(ctx: click.Context, entity_id: str, new_entity_id: str) -> None:
+    """Change an entity's entity_id in the entity registry.
+
+    Works for any registered entity regardless of integration; the registry
+    keeps the override keyed by unique_id. NEW_ENTITY_ID must be in the same
+    domain (e.g. switch.foo -> switch.bar) and not already in use.
+    """
+    result = run_with_error_handling(
+        _rename_entity(entity_id, new_entity_id, verbose=ctx.obj["verbose"])
+    )
+
+    effective = new_entity_id
+    if isinstance(result, dict):
+        entry = result.get("entity_entry", result)
+        if isinstance(entry, dict):
+            effective = entry.get("entity_id", new_entity_id)
+
+    if ctx.obj["output"] == "json":
+        output_json(
+            {
+                "success": True,
+                "from": entity_id,
+                "to": effective,
+            }
+        )
+    else:
+        click.echo(f"Renamed {entity_id} -> {effective}")
 
 
 @cli.command(name="remove-device")

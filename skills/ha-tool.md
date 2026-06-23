@@ -88,6 +88,16 @@ ha-tool -o json calendar <entity_id> [--start now] [--end 7d]   # Events in wind
 ha-tool -o json verify <file> [--filter all|missing|existing]
 ```
 
+### Registry edits
+
+```bash
+ha-tool -o json rename-entity <entity_id> <new_entity_id>   # Change an entity's entity_id
+```
+
+Notes:
+- `rename-entity` works for any registered entity (the override is keyed by unique_id, so it survives integration reloads). `NEW_ENTITY_ID` must be in the same domain and not already taken.
+- Useful when an integration rebuild re-assigns entity_ids and config/templates still reference the old ones.
+
 ### Remove (destructive — prompts unless `-y`)
 
 ```bash
