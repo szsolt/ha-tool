@@ -20,8 +20,11 @@ note() { echo "  - $1"; fail=1; }
 commands="$(python3 - <<'PY'
 import re
 src = open("ha_tool/cli.py").read()
-named = re.findall(r'@cli\.command\(name="([^"]+)"\)', src)
-defs = re.findall(r'@cli\.command\(\)\s*\n(?:@[^\n]*\n)*def (\w+)', src)
+# Only top-level commands (registered on `app`) are gated for documentation.
+# Sub-group commands (e.g. `@notifications_app.command`) are covered by their
+# parent group's entry and use generic verbs (list/dismiss) we don't gate.
+named = re.findall(r'@app\.command\(name="([^"]+)"\)', src)
+defs = re.findall(r'@app\.command\(\)\s*\n(?:@[^\n]*\n)*def (\w+)', src)
 defs = [d.replace("_", "-") for d in defs]
 print("\n".join(sorted(set(named + defs))))
 PY

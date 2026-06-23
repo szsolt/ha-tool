@@ -29,7 +29,7 @@ classifiers = [
     "Topic :: Home Automation",
     "Typing :: Typed",
 ]
-dependencies = ["click>=8.1", "pydantic>=2.0", "websockets>=13.0"]
+dependencies = ["typer>=0.12", "pydantic>=2.0", "websockets>=13.0"]
 
 [project.urls]
 Homepage = "https://github.com/szsolt/ha-tool"
