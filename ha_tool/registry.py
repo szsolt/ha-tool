@@ -3,9 +3,13 @@ from __future__ import annotations
 import fnmatch
 import re
 from collections import defaultdict
+from datetime import datetime, timezone
 
 from ha_tool.models import (
     AreaInfo,
+    DeviceCandidate,
+    DeviceDetail,
+    DeviceEntityRow,
     DeviceInfo,
     DomainSummary,
     EntityDetail,
@@ -16,6 +20,7 @@ from ha_tool.models import (
     IntegrationSummary,
     ServiceField,
     ServiceInfo,
+    StaleEntity,
 )
 
 
@@ -225,6 +230,141 @@ class EntityIndex:
             if eid in self._registry or eid in self._states:
                 results.append(self.to_detail(eid))
         return results
+
+    def stale_report(
+        self,
+        stale_seconds: int,
+        now_iso: str | None = None,
+        domain: str | None = None,
+        area: str | None = None,
+        integration: str | None = None,
+        only: set[str] | None = None,
+    ) -> list[StaleEntity]:
+        """Flag entities that are unhealthy. Only entities with >=1 flag are returned.
+
+        Flags: unavailable, unknown, stale, restored, orphaned, disabled, hidden.
+        `stale_seconds` is the last_updated age threshold. `now_iso` overrides the
+        clock for testing. `only` restricts to entities carrying a given flag."""
+        if now_iso:
+            now = datetime.fromisoformat(now_iso.replace("Z", "+00:00"))
+        else:
+            now = datetime.now(timezone.utc)
+
+        area_lower = area.lower() if area else None
+        results: list[StaleEntity] = []
+
+        for eid in self.all_entity_ids:
+            reg = self._registry.get(eid)
+            st = self._states.get(eid)
+
+            if domain and self._domain(eid) != domain:
+                continue
+            resolved_area = self._resolve_area(eid)
+            if area_lower and (
+                not resolved_area or area_lower not in resolved_area.lower()
+            ):
+                continue
+            if integration and (
+                not reg or (reg.platform or "").lower() != integration.lower()
+            ):
+                continue
+
+            flags: list[str] = []
+            if st and st.state == "unavailable":
+                flags.append("unavailable")
+            if st and st.state == "unknown":
+                flags.append("unknown")
+            if st and st.attributes.get("restored") is True:
+                flags.append("restored")
+            if reg and not st:
+                flags.append("orphaned")
+            if reg and reg.disabled_by:
+                flags.append("disabled")
+            if reg and reg.hidden_by:
+                flags.append("hidden")
+
+            lu = st.last_updated if st else None
+            if lu:
+                try:
+                    lu_dt = datetime.fromisoformat(lu.replace("Z", "+00:00"))
+                    if (now - lu_dt).total_seconds() > stale_seconds:
+                        flags.append("stale")
+                except (ValueError, TypeError):
+                    pass
+
+            if not flags:
+                continue
+            if only and not (set(flags) & only):
+                continue
+
+            results.append(
+                StaleEntity(
+                    entity_id=eid,
+                    flags=flags,
+                    state=st.state if st else None,
+                    last_updated=lu,
+                    area=resolved_area,
+                    platform=reg.platform if reg else None,
+                )
+            )
+
+        return results
+
+    def _entities_for_device(self, device_id: str) -> list[DeviceEntityRow]:
+        rows: list[DeviceEntityRow] = []
+        for eid, reg in self._registry.items():
+            if reg.device_id == device_id:
+                st = self._states.get(eid)
+                rows.append(
+                    DeviceEntityRow(
+                        entity_id=eid,
+                        state=st.state if st else None,
+                        friendly_name=self._resolve_friendly_name(eid),
+                    )
+                )
+        return sorted(rows, key=lambda r: r.entity_id)
+
+    def _device_detail(self, dev: DeviceInfo) -> DeviceDetail:
+        area_name: str | None = None
+        if dev.area_id:
+            area = self._areas.get(dev.area_id)
+            area_name = area.name if area else dev.area_id
+        return DeviceDetail(
+            device_id=dev.device_id,
+            name=dev.display_name,
+            manufacturer=dev.manufacturer,
+            model=dev.model,
+            area=area_name,
+            config_entries=dev.config_entries,
+            via_device_id=dev.via_device_id,
+            identifiers=dev.identifiers,
+            connections=dev.connections,
+            disabled_by=dev.disabled_by,
+            entities=self._entities_for_device(dev.device_id),
+        )
+
+    def device_inspect(self, query: str) -> "DeviceDetail | list[DeviceCandidate]":
+        """Resolve a device by exact id, else by name substring.
+
+        Returns a DeviceDetail on a unique match, a list of DeviceCandidate on
+        ambiguity, or an empty list when nothing matches."""
+        if query in self._devices:
+            return self._device_detail(self._devices[query])
+
+        q = query.lower()
+        matches = [
+            dev
+            for dev in self._devices.values()
+            if (dev.name and q in dev.name.lower())
+            or (dev.name_by_user and q in dev.name_by_user.lower())
+        ]
+        if len(matches) == 1:
+            return self._device_detail(matches[0])
+        if not matches:
+            return []
+        return [
+            DeviceCandidate(device_id=d.device_id, name=d.display_name) for d in matches
+        ]
 
     def get_state(self, entity_id: str) -> dict | None:
         st = self._states.get(entity_id)

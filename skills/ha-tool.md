@@ -29,9 +29,12 @@ ha-tool -o json categories <scope>       # Category registry (default scope: aut
 ha-tool -o json search <text> [--domain X] [--device-class X] [--area X] [--integration X] [--include-disabled]
 ha-tool -o json inspect <entity_id> [entity_id ...]
 ha-tool -o json get <entity_id>
+ha-tool -o json device-inspect <device_id | name-substring>   # Device metadata + entity roster
 ```
 
 `search` TEXT supports substring, glob (`*` `?`), and regex (`[0-9]`, `|`, etc.) patterns.
+
+- `device-inspect` resolves by exact device_id first, then case-insensitive name substring; ambiguous matches list candidates.
 
 ### Control
 
@@ -61,9 +64,12 @@ ha-tool -o json error-log [-n LINES]
 ```bash
 ha-tool -o json health                   # System health snapshot per integration
 ha-tool -o json repairs [--include-ignored]
+ha-tool -o json stale-report [--stale 24h] [--domain X] [--area X] [--integration X] [--only FLAG]
 ha-tool -o json notifications list
 ha-tool notifications dismiss <notification_id>
 ```
+
+- `stale-report` flags entities that are unavailable, unknown, stale (last_updated older than --stale), restored, orphaned, disabled, or hidden. The `stale` flag is advisory (change-only sensors can false-positive).
 
 ### Live event stream
 
@@ -92,10 +98,16 @@ ha-tool -o json verify <file> [--filter all|missing|existing]
 
 ```bash
 ha-tool -o json rename-entity <entity_id> <new_entity_id>   # Change an entity's entity_id
+ha-tool -o json set-entity <entity_id> [--name X] [--new-id ID] [--area NAME|--area-id ID] [--label L ...] [--icon mdi:..] [--device-class X] [--disabled|--enabled] [--hidden|--unhidden] [--category config|diagnostic|none]
+ha-tool -o json bulk-rename '<regex>' '<replacement>' [--domain X] [--apply]   # Dry-run unless --apply
+ha-tool -o json wrap-entity <switch_entity_id> --as light|fan|cover|lock|siren|valve [--name "X"] [--yes]
 ```
 
 Notes:
+- `set-entity` edits any entity-registry field live (no restart). `rename-entity` is a shorthand for `set-entity --new-id`. `--label` replaces the entire label set.
+- `bulk-rename` matches the regex against each entity_id (fullmatch) and supports backrefs (\1). Dry-run by default; --apply refuses the whole batch if any collision or cross-domain rename is present.
 - `rename-entity` works for any registered entity (the override is keyed by unique_id, so it survives integration reloads). `NEW_ENTITY_ID` must be in the same domain and not already taken.
+- `wrap-entity` uses the switch_as_x integration to create a NEW wrapped entity (e.g. a light backed by a switch). This is the way to re-create switch->light/fan mappings; it is NOT a registry field edit.
 - Useful when an integration rebuild re-assigns entity_ids and config/templates still reference the old ones.
 
 ### Remove (destructive — prompts unless `-y`)

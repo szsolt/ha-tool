@@ -18,6 +18,11 @@ class DeviceInfo(BaseModel):
     model: str | None = None
     area_id: str | None = None
     labels: list[str] = Field(default_factory=list)
+    config_entries: list[str] = Field(default_factory=list)
+    via_device_id: str | None = None
+    identifiers: list = Field(default_factory=list)
+    connections: list = Field(default_factory=list)
+    disabled_by: str | None = None
 
     model_config = {"populate_by_name": True}
 
@@ -77,6 +82,40 @@ class EntityDetail(BaseModel):
     labels: list[str] = Field(default_factory=list)
     disabled_by: str | None = None
     hidden_by: str | None = None
+
+
+class DeviceEntityRow(BaseModel):
+    entity_id: str
+    state: str | None = None
+    friendly_name: str | None = None
+
+
+class DeviceDetail(BaseModel):
+    device_id: str
+    name: str | None = None
+    manufacturer: str | None = None
+    model: str | None = None
+    area: str | None = None
+    config_entries: list[str] = Field(default_factory=list)
+    via_device_id: str | None = None
+    identifiers: list = Field(default_factory=list)
+    connections: list = Field(default_factory=list)
+    disabled_by: str | None = None
+    entities: list[DeviceEntityRow] = Field(default_factory=list)
+
+
+class DeviceCandidate(BaseModel):
+    device_id: str
+    name: str | None = None
+
+
+class StaleEntity(BaseModel):
+    entity_id: str
+    flags: list[str] = Field(default_factory=list)
+    state: str | None = None
+    last_updated: str | None = None
+    area: str | None = None
+    platform: str | None = None
 
 
 class DomainSummary(BaseModel):

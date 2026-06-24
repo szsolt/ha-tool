@@ -27,6 +27,21 @@ class FilterMode(str, Enum):
     existing = "existing"
 
 
+class EntityCategory(str, Enum):
+    config = "config"
+    diagnostic = "diagnostic"
+    none = "none"
+
+
+class WrapDomain(str, Enum):
+    light = "light"
+    fan = "fan"
+    cover = "cover"
+    lock = "lock"
+    siren = "siren"
+    valve = "valve"
+
+
 @dataclass
 class State:
     output: OutputFormat = OutputFormat.human
@@ -38,8 +53,8 @@ state = State()
 app = typer.Typer(
     name="ha-tool",
     help="Home Assistant entity discovery tool for AI agents.",
-    rich_markup_mode=None,
-    add_completion=False,
+    rich_markup_mode="rich",
+    add_completion=True,
     no_args_is_help=True,
 )
 
@@ -107,6 +122,49 @@ def output_table(rows: list[dict], columns: list[str]) -> None:
         typer.echo("  ".join(vals))
 
     typer.echo(f"\n({len(rows)} results)")
+
+
+def _build_entity_fields(
+    *,
+    name: str | None,
+    new_id: str | None,
+    area_id: str | None,
+    labels: list[str] | None,
+    icon: str | None,
+    device_class: str | None,
+    disabled: bool | None,
+    hidden: bool | None,
+    category: "EntityCategory | None",
+) -> dict[str, Any]:
+    """Assemble config/entity_registry/update fields from CLI options.
+
+    disabled/hidden: True -> "user", False -> None (clear), None -> omit.
+    category none -> None (clear); config/diagnostic -> that string; None -> omit.
+    Raises ValueError if no field would be changed."""
+    fields: dict[str, Any] = {}
+    if name is not None:
+        fields["name"] = name
+    if new_id is not None:
+        fields["new_entity_id"] = new_id
+    if area_id is not None:
+        fields["area_id"] = area_id
+    if labels is not None:
+        fields["labels"] = labels
+    if icon is not None:
+        fields["icon"] = icon
+    if device_class is not None:
+        fields["device_class"] = device_class
+    if disabled is not None:
+        fields["disabled_by"] = "user" if disabled else None
+    if hidden is not None:
+        fields["hidden_by"] = "user" if hidden else None
+    if category is not None:
+        fields["entity_category"] = (
+            None if category == EntityCategory.none else category.value
+        )
+    if not fields:
+        raise ValueError("No fields to update. Provide at least one option.")
+    return fields
 
 
 def run_with_error_handling(coro: Any) -> Any:
@@ -1214,6 +1272,99 @@ async def _rename_entity(
         return await client.rename_entity(entity_id, new_entity_id)
 
 
+async def _update_entity(
+    entity_id: str, fields: dict[str, Any], verbose: bool = False
+) -> dict | None:
+    url, token = get_config()
+    async with HAWebSocketClient(url, token, verbose=verbose) as client:
+        return await client.update_entity(entity_id, **fields)
+
+
+async def _bulk_apply(
+    renames: list[tuple[str, str]], verbose: bool = False
+) -> list[dict]:
+    url, token = get_config()
+    out: list[dict] = []
+    async with HAWebSocketClient(url, token, verbose=verbose) as client:
+        for old_id, new_id in renames:
+            try:
+                await client.update_entity(old_id, new_entity_id=new_id)
+                out.append(
+                    {"from": old_id, "to": new_id, "success": True, "error": None}
+                )
+            except Exception as e:
+                out.append(
+                    {"from": old_id, "to": new_id, "success": False, "error": str(e)}
+                )
+    return out
+
+
+async def _wrap_entity(
+    source: str, target_domain: str, name: str | None, verbose: bool = False
+) -> dict:
+    """Create a switch_as_x wrapped entity backed by `source`.
+
+    switch_as_x is a single-step config flow (step_id "user") taking
+    `entity_id` (the source switch) and `target_domain`. The flow has no name
+    field, so when `--name` is given we resolve the entity created against the
+    new config entry and set its friendly name via the entity registry.
+    """
+    url, token = get_config()
+    async with HAWebSocketClient(url, token, verbose=verbose) as client:
+        started = await client.start_config_flow(
+            "switch_as_x", show_advanced_options=False
+        )
+        flow_id = started.get("flow_id") if started else None
+        if not flow_id:
+            raise RuntimeError(f"switch_as_x flow did not start: {started}")
+        completed = False
+        try:
+            data: dict[str, Any] = {
+                "entity_id": source,
+                "target_domain": target_domain,
+            }
+            result = await client.configure_config_flow(flow_id, data)
+            if not result or result.get("type") != "create_entry":
+                errors = (result or {}).get("errors") or result
+                raise RuntimeError(f"switch_as_x flow did not complete: {errors}")
+            completed = True
+        finally:
+            if not completed:
+                # Best-effort cleanup; don't mask the original error.
+                try:
+                    await client.abort_config_flow(flow_id)
+                except Exception:
+                    pass
+
+        # Resolve the entity created against the new config entry so we can
+        # report its id and (optionally) rename it.
+        entry = result.get("result") or {}
+        entry_id = entry.get("entry_id") if isinstance(entry, dict) else None
+        new_entity_id = None
+        if entry_id:
+            registry = await client.get_entity_registry()
+            for e in registry:
+                if (
+                    e.get("config_entry_id") == entry_id
+                    and (e.get("entity_id") or "").split(".", 1)[0] == target_domain
+                ):
+                    new_entity_id = e.get("entity_id")
+                    break
+
+        if name is not None and new_entity_id:
+            await client.update_entity(new_entity_id, name=name)
+
+        return {"result": result, "new_entity_id": new_entity_id, "entry_id": entry_id}
+
+
+async def _resolve_area_id(name: str, verbose: bool = False) -> str | None:
+    index = await build_index(verbose=verbose)
+    for area in index.list_areas():
+        if area.name.lower() == name.lower() or area.area_id == name:
+            return area.area_id
+    return None
+
+
 async def _remove_device(
     device_id: str, config_entry_id: str, verbose: bool = False
 ) -> dict | None:
@@ -1282,6 +1433,326 @@ def rename_entity(entity_id: str, new_entity_id: str) -> None:
         )
     else:
         typer.echo(f"Renamed {entity_id} -> {effective}")
+
+
+@app.command(name="set-entity")
+def set_entity(
+    entity_id: str,
+    name: Annotated[
+        Optional[str], typer.Option("--name", help="Friendly name override")
+    ] = None,
+    new_id: Annotated[
+        Optional[str], typer.Option("--new-id", help="Rename entity_id (same domain)")
+    ] = None,
+    area: Annotated[
+        Optional[str], typer.Option("--area", help="Assign area by name")
+    ] = None,
+    area_id: Annotated[
+        Optional[str], typer.Option("--area-id", help="Assign area by raw area_id")
+    ] = None,
+    labels: Annotated[
+        Optional[list[str]],
+        typer.Option("--label", help="Set label (repeatable; replaces label set)"),
+    ] = None,
+    icon: Annotated[
+        Optional[str], typer.Option("--icon", help="Icon override (mdi:...)")
+    ] = None,
+    device_class: Annotated[
+        Optional[str], typer.Option("--device-class", help="device_class override")
+    ] = None,
+    disabled: Annotated[
+        Optional[bool],
+        typer.Option("--disabled/--enabled", help="Disable or re-enable the entity"),
+    ] = None,
+    hidden: Annotated[
+        Optional[bool],
+        typer.Option("--hidden/--unhidden", help="Hide or unhide the entity"),
+    ] = None,
+    category: Annotated[
+        Optional[EntityCategory],
+        typer.Option("--category", help="entity_category (config/diagnostic/none)"),
+    ] = None,
+) -> None:
+    """Edit entity registry fields (name, id, area, labels, icon, etc.).
+
+    Live edit via config/entity_registry/update — no restart. Only the options
+    you pass are changed. --area resolves a name to its area_id; --area-id
+    passes a raw id. --label is repeatable and replaces the whole label set.
+    """
+    resolved_area_id = area_id
+    if area is not None:
+        resolved_area_id = run_with_error_handling(
+            _resolve_area_id(area, verbose=state.verbose)
+        )
+        if resolved_area_id is None:
+            typer.echo(f"Area '{area}' not found.", err=True)
+            sys.exit(1)
+
+    try:
+        fields = _build_entity_fields(
+            name=name,
+            new_id=new_id,
+            area_id=resolved_area_id,
+            labels=list(labels) if labels is not None else None,
+            icon=icon,
+            device_class=device_class,
+            disabled=disabled,
+            hidden=hidden,
+            category=category,
+        )
+    except ValueError as e:
+        typer.echo(str(e), err=True)
+        sys.exit(1)
+
+    run_with_error_handling(_update_entity(entity_id, fields, verbose=state.verbose))
+
+    if state.output == OutputFormat.json:
+        output_json({"success": True, "entity_id": entity_id, "changed": fields})
+    else:
+        summary = ", ".join(f"{k}={v}" for k, v in fields.items())
+        typer.echo(f"Updated {entity_id}: {summary}")
+
+
+@app.command(name="bulk-rename")
+def bulk_rename(
+    pattern: str,
+    replacement: str,
+    domain: Annotated[
+        Optional[str],
+        typer.Option("--domain", "-d", help="Restrict to one domain before matching"),
+    ] = None,
+    apply: Annotated[
+        bool, typer.Option("--apply", help="Execute the renames (default: dry-run)")
+    ] = False,
+) -> None:
+    """Bulk-rename entity_ids by regex (sed-style, with backrefs).
+
+    PATTERN is a Python regex matched against each entity_id (fullmatch).
+    REPLACEMENT supports backrefs (\\1). Dry-run by default: prints every
+    old -> new and flags collisions, no-ops, and cross-domain renames. Pass
+    --apply to execute; a batch with any collision or cross-domain result is
+    refused before any change is made.
+    """
+    import re as _re
+
+    from ha_tool.bulk import analyze_bulk_rename
+
+    index = run_with_error_handling(build_index(verbose=state.verbose))
+    candidates = index.all_entity_ids
+    if domain:
+        candidates = [e for e in candidates if e.split(".", 1)[0] == domain]
+
+    try:
+        results = analyze_bulk_rename(candidates, pattern, replacement)
+    except _re.error as e:
+        typer.echo(f"Invalid pattern/replacement: {e}", err=True)
+        sys.exit(1)
+
+    blocking = [r for r in results if r.status in ("collision", "cross-domain")]
+
+    if not apply:
+        if state.output == OutputFormat.json:
+            output_json(
+                [
+                    {"from": r.from_id, "to": r.to_id, "status": r.status}
+                    for r in results
+                ]
+            )
+        else:
+            if not results:
+                typer.echo("No entity_ids match the pattern.")
+                return
+            for r in results:
+                mark = {
+                    "ok": " ",
+                    "noop": "=",
+                    "collision": "!",
+                    "cross-domain": "x",
+                }[r.status]
+                typer.echo(f"  [{mark}] {r.from_id}  ->  {r.to_id}  ({r.status})")
+            typer.echo("")
+            typer.echo(
+                f"{len(results)} match(es); {len(blocking)} blocking. "
+                f"Add --apply to execute."
+            )
+        return
+
+    # --apply path: pre-flight gate
+    if blocking:
+        typer.echo(
+            f"Refusing to apply: {len(blocking)} collision/cross-domain result(s). "
+            f"Re-run without --apply to inspect.",
+            err=True,
+        )
+        sys.exit(1)
+
+    renames = [(r.from_id, r.to_id) for r in results if r.status == "ok"]
+    applied = run_with_error_handling(_bulk_apply(renames, verbose=state.verbose))
+
+    if state.output == OutputFormat.json:
+        output_json(applied)
+    else:
+        for a in applied:
+            mark = "✓" if a["success"] else "✗"
+            line = f"  {mark} {a['from']}  ->  {a['to']}"
+            if not a["success"]:
+                line += f"  ({a['error']})"
+            typer.echo(line)
+        ok = sum(1 for a in applied if a["success"])
+        typer.echo("")
+        typer.echo(f"Renamed {ok}/{len(applied)}.")
+
+
+@app.command(name="stale-report")
+def stale_report(
+    stale: Annotated[
+        str, typer.Option("--stale", help="last_updated age threshold (e.g. 24h, 2d)")
+    ] = "24h",
+    domain: Annotated[
+        Optional[str], typer.Option("--domain", "-d", help="Filter by domain")
+    ] = None,
+    area: Annotated[
+        Optional[str], typer.Option("--area", "-a", help="Filter by area (substring)")
+    ] = None,
+    integration: Annotated[
+        Optional[str], typer.Option("--integration", "-i", help="Filter by platform")
+    ] = None,
+    only: Annotated[
+        Optional[list[str]],
+        typer.Option(
+            "--only",
+            help="Only show entities with this flag (repeatable): "
+            "unavailable, unknown, stale, restored, orphaned, disabled, hidden",
+        ),
+    ] = None,
+) -> None:
+    """Report unhealthy entities (unavailable, unknown, stale, restored, orphaned, disabled, hidden).
+
+    --stale sets the last_updated age threshold. Note: change-only sensors can
+    false-positive on 'stale' when last_updated legitimately freezes; treat it
+    as advisory.
+    """
+    from ha_tool.timeparse import parse_duration_seconds
+
+    stale_seconds = parse_duration_seconds(stale)
+    if stale_seconds is None:
+        typer.echo(f"Invalid --stale duration: {stale!r} (e.g. 24h, 2d)", err=True)
+        sys.exit(1)
+
+    index = run_with_error_handling(build_index(verbose=state.verbose))
+    report = index.stale_report(
+        stale_seconds=stale_seconds,
+        domain=domain,
+        area=area,
+        integration=integration,
+        only=set(only) if only else None,
+    )
+
+    if state.output == OutputFormat.json:
+        output_json([r.model_dump(exclude_none=True) for r in report])
+    else:
+        rows = [
+            {
+                "entity_id": r.entity_id,
+                "flags": ",".join(r.flags),
+                "state": r.state or "",
+                "last_updated": r.last_updated or "",
+                "area": r.area or "",
+            }
+            for r in report
+        ]
+        output_table(rows, ["entity_id", "flags", "state", "last_updated", "area"])
+
+
+@app.command(name="device-inspect")
+def device_inspect(query: str) -> None:
+    """Inspect a device by id or name substring: metadata + its entities.
+
+    Resolves QUERY as an exact device_id first, else a case-insensitive name
+    substring. Ambiguous matches list the candidates; pick one by device_id.
+    """
+    from ha_tool.models import DeviceDetail
+
+    index = run_with_error_handling(build_index(verbose=state.verbose))
+    result = index.device_inspect(query)
+
+    if isinstance(result, list):
+        if not result:
+            if state.output == OutputFormat.json:
+                output_json({"error": f"No device matching '{query}'"})
+            else:
+                typer.echo(f"No device matching '{query}'.", err=True)
+            sys.exit(1)
+        if state.output == OutputFormat.json:
+            output_json(
+                {"ambiguous": [c.model_dump(exclude_none=True) for c in result]}
+            )
+        else:
+            typer.echo(f"Multiple devices match '{query}':")
+            for c in result:
+                typer.echo(f"  {c.device_id}  {c.name or ''}")
+        sys.exit(1)
+
+    detail: DeviceDetail = result
+    if state.output == OutputFormat.json:
+        output_json(detail.model_dump(exclude_none=True))
+    else:
+        mm = " / ".join(x for x in (detail.manufacturer, detail.model) if x)
+        suffix = f"  ({mm})" if mm else ""
+        typer.echo(f"Device:  {detail.name or detail.device_id}{suffix}")
+        entry = ", ".join(detail.config_entries) if detail.config_entries else "—"
+        typer.echo(f"Area:    {detail.area or '—'}     Config entry: {entry}")
+        typer.echo(f"Entities ({len(detail.entities)}):")
+        for e in detail.entities:
+            typer.echo(f"  {e.entity_id}   {e.state or '—'}")
+
+
+@app.command(name="wrap-entity")
+def wrap_entity(
+    source_entity_id: str,
+    target: Annotated[
+        WrapDomain, typer.Option("--as", help="Target domain to wrap the switch as")
+    ],
+    name: Annotated[
+        Optional[str], typer.Option("--name", help="Name for the wrapped entity")
+    ] = None,
+    yes: Annotated[
+        bool, typer.Option("--yes", "-y", help="Skip confirmation prompt")
+    ] = False,
+) -> None:
+    """Wrap a switch as another domain via switch_as_x (e.g. switch -> light/fan).
+
+    Creates a NEW wrapped entity backed by SOURCE_ENTITY_ID. This is how you
+    re-create switch->light / switch->fan mappings (e.g. after an integration
+    rebuild). switch_as_x has no name field, so --name is applied to the new
+    entity via the registry after the flow completes.
+    """
+    if not yes and state.output != OutputFormat.json:
+        if not typer.confirm(f"Wrap {source_entity_id} as {target.value}?"):
+            typer.echo("Aborted.")
+            return
+
+    outcome = run_with_error_handling(
+        _wrap_entity(source_entity_id, target.value, name, verbose=state.verbose)
+    )
+
+    new_entity_id = outcome.get("new_entity_id") if isinstance(outcome, dict) else None
+
+    if state.output == OutputFormat.json:
+        output_json(
+            {
+                "success": True,
+                "source": source_entity_id,
+                "target_domain": target.value,
+                "new_entity_id": new_entity_id,
+                "result": outcome.get("result") if isinstance(outcome, dict) else None,
+            }
+        )
+    else:
+        typer.echo(
+            f"Wrapped {source_entity_id} as {target.value}"
+            + (f" -> {new_entity_id}" if new_entity_id else "")
+        )
 
 
 @app.command(name="remove-device")

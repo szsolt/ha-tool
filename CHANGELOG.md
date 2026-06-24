@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `set-entity`: edit entity registry fields (name, entity_id, area, labels, icon, device_class, disabled/hidden, entity_category) live via config/entity_registry/update.
+- `bulk-rename`: regex-based bulk entity_id rename with dry-run preview, collision/cross-domain detection, and an all-or-nothing --apply gate.
+- `stale-report`: sweep for unhealthy entities (unavailable/unknown/stale/restored/orphaned/disabled/hidden) with domain/area/integration/flag filters.
+- `device-inspect`: device-centric view (metadata + full entity roster) resolved by device_id or name substring.
+- `wrap-entity`: create a switch_as_x wrapped entity (switch -> light/fan/cover/lock/siren/valve) with an optional name.
 - `rename-entity` — Change an entity's `entity_id` in the entity registry (via `config/entity_registry/update` with `new_entity_id`). Works for integration-provided entities since the override is keyed by unique_id; handy after an integration rebuild re-assigns entity_ids and existing templates/config still point at the old ones.
 
 ## [0.3.0] - 2026-06-17
