@@ -5,9 +5,10 @@ import json
 import os
 import sys
 from dataclasses import dataclass
+from datetime import UTC
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
 
 import typer
 
@@ -70,9 +71,7 @@ def get_config() -> tuple[str, str]:
     token = os.environ.get("HASS_TOKEN", "")
     missing: list[str] = []
     if not url:
-        missing.append(
-            "HASS_SERVER  (e.g. export HASS_SERVER=http://homeassistant.local:8123)"
-        )
+        missing.append("HASS_SERVER  (e.g. export HASS_SERVER=http://homeassistant.local:8123)")
     if not token:
         missing.append("HASS_TOKEN   (Profile → Security → Long-Lived Access Tokens)")
     if missing:
@@ -83,9 +82,7 @@ def get_config() -> tuple[str, str]:
     return url, token
 
 
-async def build_index(
-    include_services: bool = False, verbose: bool = False
-) -> EntityIndex:
+async def build_index(include_services: bool = False, verbose: bool = False) -> EntityIndex:
     url, token = get_config()
     async with HAWebSocketClient(url, token, verbose=verbose) as client:
         states, entities, devices, areas, services = await client.fetch_all(
@@ -134,7 +131,7 @@ def _build_entity_fields(
     device_class: str | None,
     disabled: bool | None,
     hidden: bool | None,
-    category: "EntityCategory | None",
+    category: EntityCategory | None,
 ) -> dict[str, Any]:
     """Assemble config/entity_registry/update fields from CLI options.
 
@@ -159,9 +156,7 @@ def _build_entity_fields(
     if hidden is not None:
         fields["hidden_by"] = "user" if hidden else None
     if category is not None:
-        fields["entity_category"] = (
-            None if category == EntityCategory.none else category.value
-        )
+        fields["entity_category"] = None if category == EntityCategory.none else category.value
     if not fields:
         raise ValueError("No fields to update. Provide at least one option.")
     return fields
@@ -207,15 +202,13 @@ def main_callback(
 
 @app.command()
 def search(
-    text: Annotated[Optional[str], typer.Argument()] = None,
+    text: Annotated[str | None, typer.Argument()] = None,
     domain: Annotated[
-        Optional[str],
-        typer.Option(
-            "--domain", "-d", help="Filter by domain (e.g. sensor, climate, light)"
-        ),
+        str | None,
+        typer.Option("--domain", "-d", help="Filter by domain (e.g. sensor, climate, light)"),
     ] = None,
     device_class: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--device-class",
             "-c",
@@ -223,11 +216,11 @@ def search(
         ),
     ] = None,
     area: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--area", "-a", help="Filter by area name (substring match)"),
     ] = None,
     integration: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--integration",
             "-i",
@@ -318,9 +311,7 @@ def get(entity_id: str) -> None:
     if state.output == OutputFormat.json:
         output_json(result)
     else:
-        typer.echo(
-            f"{result['entity_id']}  {result['friendly_name'] or '—'}  {result['state']}"
-        )
+        typer.echo(f"{result['entity_id']}  {result['friendly_name'] or '—'}  {result['state']}")
 
 
 @app.command()
@@ -378,18 +369,14 @@ def integrations() -> None:
 
 @app.command()
 def services(
-    text: Annotated[Optional[str], typer.Argument()] = None,
+    text: Annotated[str | None, typer.Argument()] = None,
     domain: Annotated[
-        Optional[str],
-        typer.Option(
-            "--domain", "-d", help="Filter by service domain (e.g. light, climate)"
-        ),
+        str | None,
+        typer.Option("--domain", "-d", help="Filter by service domain (e.g. light, climate)"),
     ] = None,
 ) -> None:
     """List or search available service actions."""
-    index = run_with_error_handling(
-        build_index(include_services=True, verbose=state.verbose)
-    )
+    index = run_with_error_handling(build_index(include_services=True, verbose=state.verbose))
     results = index.search_services(text=text, domain=domain)
 
     if state.output == OutputFormat.json:
@@ -450,11 +437,11 @@ async def _render_template(template: str, verbose: bool = False) -> str:
 def call_service(
     service_name: str,
     data_json: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--data", "-d", help="Service data as JSON object"),
     ] = None,
     target_json: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--target",
             "-t",
@@ -503,7 +490,7 @@ def call_service(
 
 
 @app.command()
-def reload(domain: Annotated[Optional[str], typer.Argument()] = None) -> None:
+def reload(domain: Annotated[str | None, typer.Argument()] = None) -> None:
     """Reload Home Assistant configuration.
 
     DOMAIN can be: automations, scripts, scenes, groups, all, or any reloadable domain.
@@ -522,9 +509,7 @@ def reload(domain: Annotated[Optional[str], typer.Argument()] = None) -> None:
     domain = domain.lower().rstrip("s")  # Allow "automations" -> "automation"
 
     if domain == "all":
-        run_with_error_handling(
-            _call_service("homeassistant", "reload_all", verbose=state.verbose)
-        )
+        run_with_error_handling(_call_service("homeassistant", "reload_all", verbose=state.verbose))
         if state.output == OutputFormat.json:
             output_json({"success": True, "reloaded": "all"})
         else:
@@ -578,9 +563,7 @@ def template(template_str: str) -> None:
 
     TEMPLATE_STR is a Jinja2 template string, e.g. '{{ states("sensor.temperature") }}'.
     """
-    result = run_with_error_handling(
-        _render_template(template_str, verbose=state.verbose)
-    )
+    result = run_with_error_handling(_render_template(template_str, verbose=state.verbose))
 
     if state.output == OutputFormat.json:
         output_json({"template": template_str, "result": result})
@@ -636,9 +619,7 @@ def panels() -> None:
         output_json([p.model_dump(exclude_none=True) for p in items])
     else:
         rows = [p.model_dump() for p in items]
-        output_table(
-            rows, ["url_path", "title", "component_name", "icon", "require_admin"]
-        )
+        output_table(rows, ["url_path", "title", "component_name", "icon", "require_admin"])
 
 
 async def _get_config_entries(verbose: bool = False) -> list[dict]:
@@ -650,7 +631,7 @@ async def _get_config_entries(verbose: bool = False) -> list[dict]:
 @app.command(name="config-entries")
 def config_entries(
     domain: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--domain", "-d", help="Filter by integration domain"),
     ] = None,
 ) -> None:
@@ -666,9 +647,7 @@ def config_entries(
         output_json([e.model_dump(exclude_none=True) for e in items])
     else:
         rows = [e.model_dump() for e in items]
-        output_table(
-            rows, ["entry_id", "domain", "title", "state", "source", "disabled_by"]
-        )
+        output_table(rows, ["entry_id", "domain", "title", "state", "source", "disabled_by"])
 
 
 async def _get_labels(verbose: bool = False) -> list[dict]:
@@ -766,8 +745,8 @@ def history(
     ] = False,
 ) -> None:
     """Show state history of an entity over a time window."""
-    from ha_tool.timeparse import parse_time
     from ha_tool.models import HistoryPoint
+    from ha_tool.timeparse import parse_time
 
     try:
         start_dt = parse_time(since)
@@ -787,7 +766,7 @@ def history(
     )
 
     series = (raw or {}).get(entity_id, [])
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     def _expand(p: dict) -> dict:
         lu = p.get("lu") or p.get("last_updated")
@@ -799,13 +778,13 @@ def history(
             out["attributes"] = p.get("a") if "a" in p else p.get("attributes")
         if lu is not None:
             out["last_updated"] = (
-                datetime.fromtimestamp(lu, tz=timezone.utc).isoformat()
+                datetime.fromtimestamp(lu, tz=UTC).isoformat()
                 if isinstance(lu, (int, float))
                 else lu
             )
         if lc is not None:
             out["last_changed"] = (
-                datetime.fromtimestamp(lc, tz=timezone.utc).isoformat()
+                datetime.fromtimestamp(lc, tz=UTC).isoformat()
                 if isinstance(lc, (int, float))
                 else lc
             )
@@ -817,8 +796,7 @@ def history(
         output_json([p.model_dump(exclude_none=True) for p in points])
     else:
         rows = [
-            {"when": p.last_changed or p.last_updated or "", "state": p.state or ""}
-            for p in points
+            {"when": p.last_changed or p.last_updated or "", "state": p.state or ""} for p in points
         ]
         output_table(rows, ["when", "state"])
 
@@ -841,13 +819,13 @@ def logbook(
     ] = "1h",
     until: Annotated[str, typer.Option("--until", help="End time")] = "now",
     entity_ids: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         typer.Option("--entity", "-e", help="Filter by entity_id (repeatable)"),
     ] = None,
 ) -> None:
     """Show human-readable activity log."""
-    from ha_tool.timeparse import parse_time
     from ha_tool.models import LogbookEntry
+    from ha_tool.timeparse import parse_time
 
     try:
         start_dt = parse_time(since)
@@ -890,7 +868,7 @@ async def _error_log(verbose: bool = False) -> str:
 @app.command(name="error-log")
 def error_log(
     lines: Annotated[
-        Optional[int], typer.Option("--lines", "-n", help="Show only last N lines")
+        int | None, typer.Option("--lines", "-n", help="Show only last N lines")
     ] = None,
 ) -> None:
     """Fetch the Home Assistant error log."""
@@ -1033,13 +1011,11 @@ async def _watch(
 @app.command()
 def watch(
     event_type: Annotated[
-        Optional[str],
-        typer.Option(
-            "--event-type", "-t", help="Filter by event_type (e.g. state_changed)"
-        ),
+        str | None,
+        typer.Option("--event-type", "-t", help="Filter by event_type (e.g. state_changed)"),
     ] = None,
     entity_id: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--entity", "-e", help="Filter by entity_id (client-side)"),
     ] = None,
 ) -> None:
@@ -1089,20 +1065,17 @@ def calendars() -> None:
 @app.command()
 def calendar(
     entity_id: str,
-    start: Annotated[
-        str, typer.Option("--start", help="Start time (now, ISO, today)")
-    ] = "now",
+    start: Annotated[str, typer.Option("--start", help="Start time (now, ISO, today)")] = "now",
     end: Annotated[
         str,
-        typer.Option(
-            "--end", help="End time (relative offset from start, ISO, or keyword)"
-        ),
+        typer.Option("--end", help="End time (relative offset from start, ISO, or keyword)"),
     ] = "7d",
 ) -> None:
     """Show calendar events for a calendar entity over a window."""
     from datetime import timedelta
-    from ha_tool.timeparse import parse_time, parse_duration_seconds
+
     from ha_tool.models import CalendarEvent
+    from ha_tool.timeparse import parse_duration_seconds, parse_time
 
     try:
         start_dt = parse_time(start)
@@ -1222,7 +1195,7 @@ async def _lovelace_refresh(
 
 @app.command(name="lovelace-refresh")
 def lovelace_refresh(
-    url_paths: Annotated[Optional[list[str]], typer.Argument()] = None,
+    url_paths: Annotated[list[str] | None, typer.Argument()] = None,
 ) -> None:
     """Reload YAML-mode Lovelace dashboards from disk into the server cache.
 
@@ -1264,9 +1237,7 @@ async def _remove_entity(entity_id: str, verbose: bool = False) -> dict | None:
         return await client.remove_entity(entity_id)
 
 
-async def _rename_entity(
-    entity_id: str, new_entity_id: str, verbose: bool = False
-) -> dict | None:
+async def _rename_entity(entity_id: str, new_entity_id: str, verbose: bool = False) -> dict | None:
     url, token = get_config()
     async with HAWebSocketClient(url, token, verbose=verbose) as client:
         return await client.rename_entity(entity_id, new_entity_id)
@@ -1280,22 +1251,16 @@ async def _update_entity(
         return await client.update_entity(entity_id, **fields)
 
 
-async def _bulk_apply(
-    renames: list[tuple[str, str]], verbose: bool = False
-) -> list[dict]:
+async def _bulk_apply(renames: list[tuple[str, str]], verbose: bool = False) -> list[dict]:
     url, token = get_config()
     out: list[dict] = []
     async with HAWebSocketClient(url, token, verbose=verbose) as client:
         for old_id, new_id in renames:
             try:
                 await client.update_entity(old_id, new_entity_id=new_id)
-                out.append(
-                    {"from": old_id, "to": new_id, "success": True, "error": None}
-                )
+                out.append({"from": old_id, "to": new_id, "success": True, "error": None})
             except Exception as e:
-                out.append(
-                    {"from": old_id, "to": new_id, "success": False, "error": str(e)}
-                )
+                out.append({"from": old_id, "to": new_id, "success": False, "error": str(e)})
     return out
 
 
@@ -1311,9 +1276,7 @@ async def _wrap_entity(
     """
     url, token = get_config()
     async with HAWebSocketClient(url, token, verbose=verbose) as client:
-        started = await client.start_config_flow(
-            "switch_as_x", show_advanced_options=False
-        )
+        started = await client.start_config_flow("switch_as_x", show_advanced_options=False)
         flow_id = started.get("flow_id") if started else None
         if not flow_id:
             raise RuntimeError(f"switch_as_x flow did not start: {started}")
@@ -1382,9 +1345,7 @@ async def _remove_config_entry(entry_id: str, verbose: bool = False) -> dict | N
 @app.command(name="remove-entity")
 def remove_entity(
     entity_id: str,
-    yes: Annotated[
-        bool, typer.Option("--yes", "-y", help="Skip confirmation prompt")
-    ] = False,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation prompt")] = False,
 ) -> None:
     """Remove an entity from the entity registry.
 
@@ -1438,38 +1399,32 @@ def rename_entity(entity_id: str, new_entity_id: str) -> None:
 @app.command(name="set-entity")
 def set_entity(
     entity_id: str,
-    name: Annotated[
-        Optional[str], typer.Option("--name", help="Friendly name override")
-    ] = None,
+    name: Annotated[str | None, typer.Option("--name", help="Friendly name override")] = None,
     new_id: Annotated[
-        Optional[str], typer.Option("--new-id", help="Rename entity_id (same domain)")
+        str | None, typer.Option("--new-id", help="Rename entity_id (same domain)")
     ] = None,
-    area: Annotated[
-        Optional[str], typer.Option("--area", help="Assign area by name")
-    ] = None,
+    area: Annotated[str | None, typer.Option("--area", help="Assign area by name")] = None,
     area_id: Annotated[
-        Optional[str], typer.Option("--area-id", help="Assign area by raw area_id")
+        str | None, typer.Option("--area-id", help="Assign area by raw area_id")
     ] = None,
     labels: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         typer.Option("--label", help="Set label (repeatable; replaces label set)"),
     ] = None,
-    icon: Annotated[
-        Optional[str], typer.Option("--icon", help="Icon override (mdi:...)")
-    ] = None,
+    icon: Annotated[str | None, typer.Option("--icon", help="Icon override (mdi:...)")] = None,
     device_class: Annotated[
-        Optional[str], typer.Option("--device-class", help="device_class override")
+        str | None, typer.Option("--device-class", help="device_class override")
     ] = None,
     disabled: Annotated[
-        Optional[bool],
+        bool | None,
         typer.Option("--disabled/--enabled", help="Disable or re-enable the entity"),
     ] = None,
     hidden: Annotated[
-        Optional[bool],
+        bool | None,
         typer.Option("--hidden/--unhidden", help="Hide or unhide the entity"),
     ] = None,
     category: Annotated[
-        Optional[EntityCategory],
+        EntityCategory | None,
         typer.Option("--category", help="entity_category (config/diagnostic/none)"),
     ] = None,
 ) -> None:
@@ -1481,9 +1436,7 @@ def set_entity(
     """
     resolved_area_id = area_id
     if area is not None:
-        resolved_area_id = run_with_error_handling(
-            _resolve_area_id(area, verbose=state.verbose)
-        )
+        resolved_area_id = run_with_error_handling(_resolve_area_id(area, verbose=state.verbose))
         if resolved_area_id is None:
             typer.echo(f"Area '{area}' not found.", err=True)
             sys.exit(1)
@@ -1518,7 +1471,7 @@ def bulk_rename(
     pattern: str,
     replacement: str,
     domain: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--domain", "-d", help="Restrict to one domain before matching"),
     ] = None,
     apply: Annotated[
@@ -1552,12 +1505,7 @@ def bulk_rename(
 
     if not apply:
         if state.output == OutputFormat.json:
-            output_json(
-                [
-                    {"from": r.from_id, "to": r.to_id, "status": r.status}
-                    for r in results
-                ]
-            )
+            output_json([{"from": r.from_id, "to": r.to_id, "status": r.status} for r in results])
         else:
             if not results:
                 typer.echo("No entity_ids match the pattern.")
@@ -1572,8 +1520,7 @@ def bulk_rename(
                 typer.echo(f"  [{mark}] {r.from_id}  ->  {r.to_id}  ({r.status})")
             typer.echo("")
             typer.echo(
-                f"{len(results)} match(es); {len(blocking)} blocking. "
-                f"Add --apply to execute."
+                f"{len(results)} match(es); {len(blocking)} blocking. Add --apply to execute."
             )
         return
 
@@ -1608,17 +1555,15 @@ def stale_report(
     stale: Annotated[
         str, typer.Option("--stale", help="last_updated age threshold (e.g. 24h, 2d)")
     ] = "24h",
-    domain: Annotated[
-        Optional[str], typer.Option("--domain", "-d", help="Filter by domain")
-    ] = None,
+    domain: Annotated[str | None, typer.Option("--domain", "-d", help="Filter by domain")] = None,
     area: Annotated[
-        Optional[str], typer.Option("--area", "-a", help="Filter by area (substring)")
+        str | None, typer.Option("--area", "-a", help="Filter by area (substring)")
     ] = None,
     integration: Annotated[
-        Optional[str], typer.Option("--integration", "-i", help="Filter by platform")
+        str | None, typer.Option("--integration", "-i", help="Filter by platform")
     ] = None,
     only: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         typer.Option(
             "--only",
             help="Only show entities with this flag (repeatable): "
@@ -1626,7 +1571,8 @@ def stale_report(
         ),
     ] = None,
 ) -> None:
-    """Report unhealthy entities (unavailable, unknown, stale, restored, orphaned, disabled, hidden).
+    """Report unhealthy entities (unavailable, unknown, stale, restored, orphaned,
+    disabled, hidden).
 
     --stale sets the last_updated age threshold. Note: change-only sensors can
     false-positive on 'stale' when last_updated legitimately freezes; treat it
@@ -1684,9 +1630,7 @@ def device_inspect(query: str) -> None:
                 typer.echo(f"No device matching '{query}'.", err=True)
             sys.exit(1)
         if state.output == OutputFormat.json:
-            output_json(
-                {"ambiguous": [c.model_dump(exclude_none=True) for c in result]}
-            )
+            output_json({"ambiguous": [c.model_dump(exclude_none=True) for c in result]})
         else:
             typer.echo(f"Multiple devices match '{query}':")
             for c in result:
@@ -1710,15 +1654,9 @@ def device_inspect(query: str) -> None:
 @app.command(name="wrap-entity")
 def wrap_entity(
     source_entity_id: str,
-    target: Annotated[
-        WrapDomain, typer.Option("--as", help="Target domain to wrap the switch as")
-    ],
-    name: Annotated[
-        Optional[str], typer.Option("--name", help="Name for the wrapped entity")
-    ] = None,
-    yes: Annotated[
-        bool, typer.Option("--yes", "-y", help="Skip confirmation prompt")
-    ] = False,
+    target: Annotated[WrapDomain, typer.Option("--as", help="Target domain to wrap the switch as")],
+    name: Annotated[str | None, typer.Option("--name", help="Name for the wrapped entity")] = None,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation prompt")] = False,
 ) -> None:
     """Wrap a switch as another domain via switch_as_x (e.g. switch -> light/fan).
 
@@ -1759,9 +1697,7 @@ def wrap_entity(
 def remove_device(
     device_id: str,
     config_entry_id: str,
-    yes: Annotated[
-        bool, typer.Option("--yes", "-y", help="Skip confirmation prompt")
-    ] = False,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation prompt")] = False,
 ) -> None:
     """Disassociate a device from a config entry.
 
@@ -1770,14 +1706,13 @@ def remove_device(
     """
     if not yes and state.output != OutputFormat.json:
         if not typer.confirm(
-            f"Remove device '{device_id}' from config entry '{config_entry_id}'? This cannot be undone."
+            f"Remove device '{device_id}' from config entry '{config_entry_id}'? "
+            "This cannot be undone."
         ):
             typer.echo("Aborted.")
             return
 
-    run_with_error_handling(
-        _remove_device(device_id, config_entry_id, verbose=state.verbose)
-    )
+    run_with_error_handling(_remove_device(device_id, config_entry_id, verbose=state.verbose))
 
     if state.output == OutputFormat.json:
         output_json(
@@ -1794,9 +1729,7 @@ def remove_device(
 @app.command(name="remove-config-entry")
 def remove_config_entry(
     entry_id: str,
-    yes: Annotated[
-        bool, typer.Option("--yes", "-y", help="Skip confirmation prompt")
-    ] = False,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation prompt")] = False,
 ) -> None:
     """Remove an integration config entry.
 
@@ -1805,14 +1738,13 @@ def remove_config_entry(
     """
     if not yes and state.output != OutputFormat.json:
         if not typer.confirm(
-            f"Remove config entry '{entry_id}'? This will delete the integration and its entities. This cannot be undone."
+            f"Remove config entry '{entry_id}'? This will delete the integration "
+            "and its entities. This cannot be undone."
         ):
             typer.echo("Aborted.")
             return
 
-    result = run_with_error_handling(
-        _remove_config_entry(entry_id, verbose=state.verbose)
-    )
+    result = run_with_error_handling(_remove_config_entry(entry_id, verbose=state.verbose))
 
     if state.output == OutputFormat.json:
         output_json({"success": True, "removed_entry": entry_id, "result": result})
@@ -1838,9 +1770,7 @@ def verify(
     Extracts all entity patterns (e.g. sensor.pool_temp, light.kitchen)
     from the given files and checks each against the live HA instance.
     """
-    index = run_with_error_handling(
-        build_index(include_services=True, verbose=state.verbose)
-    )
+    index = run_with_error_handling(build_index(include_services=True, verbose=state.verbose))
 
     all_refs: list[dict] = []
     for filepath in files:
@@ -1870,9 +1800,7 @@ def verify(
             status = "✓" if ref["exists"] else "✗"
             name = ref.get("friendly_name", "")
             name_str = f"  ({name})" if name else ""
-            typer.echo(
-                f"  {status} {ref['file']}:{ref['line']}  {ref['entity_id']}{name_str}"
-            )
+            typer.echo(f"  {status} {ref['file']}:{ref['line']}  {ref['entity_id']}{name_str}")
 
         missing = sum(1 for r in all_refs if not r["exists"])
         found = sum(1 for r in all_refs if r["exists"])

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timedelta, timezone
-
+from datetime import UTC, datetime, timedelta
 
 _RELATIVE_RE = re.compile(r"^(\d+)\s*([smhdw])$", re.IGNORECASE)
 _UNIT_SECONDS = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800}
@@ -32,7 +31,7 @@ def parse_time(value: str, *, now: datetime | None = None) -> datetime:
     if not isinstance(value, str) or not value.strip():
         raise ValueError("Empty time value")
 
-    now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    now = (now or datetime.now(UTC)).astimezone(UTC)
     s = value.strip().lower()
 
     if s == "now":
@@ -40,11 +39,11 @@ def parse_time(value: str, *, now: datetime | None = None) -> datetime:
     if s == "today":
         local = now.astimezone()
         midnight = local.replace(hour=0, minute=0, second=0, microsecond=0)
-        return midnight.astimezone(timezone.utc)
+        return midnight.astimezone(UTC)
     if s == "yesterday":
         local = now.astimezone()
         midnight = local.replace(hour=0, minute=0, second=0, microsecond=0)
-        return (midnight - timedelta(days=1)).astimezone(timezone.utc)
+        return (midnight - timedelta(days=1)).astimezone(UTC)
 
     m = _RELATIVE_RE.match(s)
     if m:
@@ -57,5 +56,5 @@ def parse_time(value: str, *, now: datetime | None = None) -> datetime:
     except ValueError as e:
         raise ValueError(f"Cannot parse time: {value!r}") from e
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)

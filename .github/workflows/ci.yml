@@ -19,11 +19,13 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install ruff mypy
-          pip install -e .
+          pip install -e . ruff==0.16.2 mypy==2.3.0
 
       - name: Lint with ruff
         run: ruff check .
+
+      - name: Check formatting
+        run: ruff format --check .
 
       - name: Type check with mypy
         run: mypy ha_tool --ignore-missing-imports

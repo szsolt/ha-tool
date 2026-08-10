@@ -1,6 +1,6 @@
 import pytest
 
-from ha_tool.cli import _build_entity_fields, EntityCategory
+from ha_tool.cli import EntityCategory, _build_entity_fields
 
 
 def test_basic_fields_assembled():

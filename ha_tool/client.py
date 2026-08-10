@@ -62,7 +62,7 @@ class HAWebSocketClient:
             self._ws = await connect(self._url, max_size=2**24, open_timeout=10)
         except InvalidURI as e:
             raise ConnectionError(f"Invalid WebSocket URL: {self._url} ({e})") from e
-        except (OSError, asyncio.TimeoutError, TimeoutError) as e:
+        except (OSError, TimeoutError) as e:
             raise ConnectionError(
                 f"Cannot connect to {self._url}: {e}\n"
                 f"Check that HASS_URL is correct and Home Assistant is reachable."
@@ -238,9 +238,7 @@ class HAWebSocketClient:
         return await self.send_command("call_service", **kwargs)
 
     async def remove_entity(self, entity_id: str) -> dict | None:
-        return await self.send_command(
-            "config/entity_registry/remove", entity_id=entity_id
-        )
+        return await self.send_command("config/entity_registry/remove", entity_id=entity_id)
 
     async def update_entity(self, entity_id: str, **fields: Any) -> dict | None:
         """Update entity registry fields via config/entity_registry/update.
@@ -264,9 +262,7 @@ class HAWebSocketClient:
     async def remove_config_entry(self, entry_id: str) -> dict | None:
         return await self.send_command("config_entries/remove", entry_id=entry_id)
 
-    def _rest_json(
-        self, method: str, path: str, body: dict | None = None
-    ) -> tuple[int, Any]:
+    def _rest_json(self, method: str, path: str, body: dict | None = None) -> tuple[int, Any]:
         """Synchronous REST call returning (status_code, parsed_json).
 
         Used for endpoints not exposed over the WebSocket API (config flows).
@@ -288,9 +284,7 @@ class HAWebSocketClient:
         except urllib.error.HTTPError as e:
             body_text = e.read().decode("utf-8", errors="replace")
             if e.code == 401:
-                raise PermissionError(
-                    "Authentication failed (HTTP 401). Check HASS_TOKEN."
-                ) from e
+                raise PermissionError("Authentication failed (HTTP 401). Check HASS_TOKEN.") from e
             try:
                 parsed = json.loads(body_text)
             except json.JSONDecodeError:
@@ -306,9 +300,7 @@ class HAWebSocketClient:
         body: dict[str, Any] = {"handler": handler, **kwargs}
 
         def _do() -> dict:
-            status, parsed = self._rest_json(
-                "POST", "/api/config/config_entries/flow", body
-            )
+            status, parsed = self._rest_json("POST", "/api/config/config_entries/flow", body)
             if status != 200 or not isinstance(parsed, dict):
                 raise RuntimeError(
                     f"Failed to start config flow '{handler}' (HTTP {status}): {parsed}"
@@ -327,9 +319,7 @@ class HAWebSocketClient:
                 "POST", f"/api/config/config_entries/flow/{flow_id}", data
             )
             if status != 200 or not isinstance(parsed, dict):
-                raise RuntimeError(
-                    f"Failed to configure config flow (HTTP {status}): {parsed}"
-                )
+                raise RuntimeError(f"Failed to configure config flow (HTTP {status}): {parsed}")
             return parsed
 
         return await asyncio.to_thread(_do)
@@ -338,9 +328,7 @@ class HAWebSocketClient:
         """Abort an in-progress config flow via REST DELETE."""
 
         def _do() -> dict | None:
-            status, parsed = self._rest_json(
-                "DELETE", f"/api/config/config_entries/flow/{flow_id}"
-            )
+            status, parsed = self._rest_json("DELETE", f"/api/config/config_entries/flow/{flow_id}")
             return parsed if isinstance(parsed, dict) else None
 
         return await asyncio.to_thread(_do)
@@ -482,7 +470,8 @@ class HAWebSocketClient:
                     if not msg.get("success", False):
                         err = msg.get("error", {})
                         raise RuntimeError(
-                            f"system_health/info failed: {err.get('code','?')} - {err.get('message','?')}"
+                            f"system_health/info failed: {err.get('code', '?')} - "
+                            f"{err.get('message', '?')}"
                         )
                     ack_seen = True
                 elif msg.get("type") == "event":
@@ -495,7 +484,7 @@ class HAWebSocketClient:
             while True:
                 try:
                     msg = await asyncio.wait_for(queue.get(), timeout=idle_timeout)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     return result
                 if msg.get("type") == "event":
                     ev = msg.get("event", {})
@@ -527,7 +516,7 @@ class HAWebSocketClient:
             if not ack.get("success", False):
                 err = ack.get("error", {})
                 raise RuntimeError(
-                    f"subscribe_events failed: {err.get('code','?')} - {err.get('message','?')}"
+                    f"subscribe_events failed: {err.get('code', '?')} - {err.get('message', '?')}"
                 )
 
             while True:

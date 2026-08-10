@@ -3,7 +3,7 @@ from __future__ import annotations
 import fnmatch
 import re
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ha_tool.models import (
     AreaInfo,
@@ -194,14 +194,10 @@ class EntityIndex:
                 continue
 
             resolved_area = self._resolve_area(eid)
-            if area_lower and (
-                not resolved_area or area_lower not in resolved_area.lower()
-            ):
+            if area_lower and (not resolved_area or area_lower not in resolved_area.lower()):
                 continue
 
-            if integration and (
-                not reg or (reg.platform or "").lower() != integration.lower()
-            ):
+            if integration and (not reg or (reg.platform or "").lower() != integration.lower()):
                 continue
 
             if text_matcher:
@@ -248,7 +244,7 @@ class EntityIndex:
         if now_iso:
             now = datetime.fromisoformat(now_iso.replace("Z", "+00:00"))
         else:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
 
         area_lower = area.lower() if area else None
         results: list[StaleEntity] = []
@@ -260,13 +256,9 @@ class EntityIndex:
             if domain and self._domain(eid) != domain:
                 continue
             resolved_area = self._resolve_area(eid)
-            if area_lower and (
-                not resolved_area or area_lower not in resolved_area.lower()
-            ):
+            if area_lower and (not resolved_area or area_lower not in resolved_area.lower()):
                 continue
-            if integration and (
-                not reg or (reg.platform or "").lower() != integration.lower()
-            ):
+            if integration and (not reg or (reg.platform or "").lower() != integration.lower()):
                 continue
 
             flags: list[str] = []
@@ -343,7 +335,7 @@ class EntityIndex:
             entities=self._entities_for_device(dev.device_id),
         )
 
-    def device_inspect(self, query: str) -> "DeviceDetail | list[DeviceCandidate]":
+    def device_inspect(self, query: str) -> DeviceDetail | list[DeviceCandidate]:
         """Resolve a device by exact id, else by name substring.
 
         Returns a DeviceDetail on a unique match, a list of DeviceCandidate on
@@ -362,9 +354,7 @@ class EntityIndex:
             return self._device_detail(matches[0])
         if not matches:
             return []
-        return [
-            DeviceCandidate(device_id=d.device_id, name=d.display_name) for d in matches
-        ]
+        return [DeviceCandidate(device_id=d.device_id, name=d.display_name) for d in matches]
 
     def get_state(self, entity_id: str) -> dict | None:
         st = self._states.get(entity_id)
@@ -442,9 +432,7 @@ class EntityIndex:
                             name=fname,
                             description=fdata.get("description"),
                             required=fdata.get("required", False),
-                            example=str(fdata["example"])
-                            if "example" in fdata
-                            else None,
+                            example=str(fdata["example"]) if "example" in fdata else None,
                             selector=fdata.get("selector"),
                         )
                     )
@@ -474,7 +462,9 @@ class EntityIndex:
             if domain and svc.domain != domain:
                 continue
             if text_lower:
-                searchable = f"{svc.domain}.{svc.service} {svc.name or ''} {svc.description or ''}".lower()
+                searchable = (
+                    f"{svc.domain}.{svc.service} {svc.name or ''} {svc.description or ''}"
+                ).lower()
                 if text_lower not in searchable:
                     continue
             results.append(svc)
@@ -492,9 +482,7 @@ class EntityIndex:
     def extract_and_verify(self, filepath: str, content: str) -> list[EntityReference]:
         """Extract entity references from text and verify each against the registry."""
         domains = self.known_domains()
-        domain_alt = "|".join(
-            re.escape(d) for d in sorted(domains, key=len, reverse=True)
-        )
+        domain_alt = "|".join(re.escape(d) for d in sorted(domains, key=len, reverse=True))
         pattern = re.compile(rf"\b({domain_alt})\.[a-z][a-z0-9_]*\b")
 
         # Build set of known service names to exclude (e.g. light.turn_on)
