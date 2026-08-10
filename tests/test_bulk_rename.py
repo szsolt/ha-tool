@@ -15,9 +15,7 @@ def _ids():
 
 
 def test_backref_substitution():
-    results = analyze_bulk_rename(
-        _ids(), r"switch\.fan_(.*)", r"switch.light_\1_l1"
-    )
+    results = analyze_bulk_rename(_ids(), r"switch\.fan_(.*)", r"switch.light_\1_l1")
     by_from = {r.from_id: r for r in results}
     assert by_from["switch.fan_master_low"].to_id == "switch.light_master_low_l1"
     assert by_from["switch.fan_master_low"].status == "ok"
@@ -26,30 +24,22 @@ def test_backref_substitution():
 
 
 def test_collision_target_exists():
-    results = analyze_bulk_rename(
-        _ids(), r"switch\.fan_bed_high", "switch.keep_me"
-    )
+    results = analyze_bulk_rename(_ids(), r"switch\.fan_bed_high", "switch.keep_me")
     assert results[0].status == "collision"
 
 
 def test_collision_two_sources_one_target():
-    results = analyze_bulk_rename(
-        _ids(), r"switch\.fan_(.*)", "switch.fan_same"
-    )
+    results = analyze_bulk_rename(_ids(), r"switch\.fan_(.*)", "switch.fan_same")
     assert all(r.status == "collision" for r in results)
 
 
 def test_noop_when_replacement_equals_source():
-    results = analyze_bulk_rename(
-        _ids(), r"switch\.keep_me", "switch.keep_me"
-    )
+    results = analyze_bulk_rename(_ids(), r"switch\.keep_me", "switch.keep_me")
     assert results[0].status == "noop"
 
 
 def test_cross_domain_flagged():
-    results = analyze_bulk_rename(
-        _ids(), r"switch\.fan_bed_high", "light.fan_bed_high"
-    )
+    results = analyze_bulk_rename(_ids(), r"switch\.fan_bed_high", "light.fan_bed_high")
     assert results[0].status == "cross-domain"
 
 

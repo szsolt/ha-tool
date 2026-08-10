@@ -1,5 +1,3 @@
-import pytest
-
 from ha_tool.models import DeviceCandidate, DeviceDetail
 
 
@@ -8,7 +6,11 @@ def test_resolve_by_exact_id(index):
     assert isinstance(result, DeviceDetail)
     assert result.name == "Office Fan"
     ids = {e.entity_id for e in result.entities}
-    assert ids == {"switch.office_fan_l1", "switch.office_fan_l2", "sensor.office_fan_rssi"}
+    assert ids == {
+        "switch.office_fan_l1",
+        "switch.office_fan_l2",
+        "sensor.office_fan_rssi",
+    }
 
 
 def test_resolve_by_name_substring(index):

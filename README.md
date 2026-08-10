@@ -8,6 +8,7 @@ A CLI tool for discovering, querying, and controlling Home Assistant over WebSoc
 ## Features
 
 - **Entity Discovery** — Search, inspect, and list entities with flexible filtering
+- **Registry Editing** — Rename, re-area, relabel, and bulk-remap entities live
 - **Service Calls** — Call any Home Assistant service with JSON data/targets
 - **Configuration Reload** — Reload automations, scripts, scenes, and more
 - **Template Rendering** — Test Jinja2 templates against your live instance
@@ -177,6 +178,66 @@ ha-tool verify -m automations.yaml
 ```
 
 Extracts all patterns matching `<known_domain>.<object_id>` from the given files, filters out known service names (e.g. `light.turn_on`), and checks each entity against the live HA instance.
+
+### Edit the entity registry
+
+```bash
+# Only the fields you pass are changed
+ha-tool set-entity sensor.pool_temp --name "Pool Temperature" --area "Pool"
+ha-tool set-entity light.kitchen --icon mdi:ceiling-light --category config
+ha-tool set-entity switch.old_name --new-id switch.new_name
+
+# rename-entity is a shorthand for set-entity --new-id
+ha-tool rename-entity switch.old_name switch.new_name
+```
+
+Live edit via `config/entity_registry/update` — no restart. `--new-id` must stay
+in the same domain. `--label` is repeatable and replaces the whole label set.
+
+### Bulk rename by regex
+
+```bash
+# Dry-run by default — prints every old -> new
+ha-tool bulk-rename 'sensor\.old_(.*)' 'sensor.new_\1'
+
+ha-tool bulk-rename -d switch 'switch\.zb_(.*)' 'switch.\1' --apply
+```
+
+PATTERN is a Python regex `fullmatch`ed against each entity_id; REPLACEMENT
+supports backrefs. A batch containing any collision or cross-domain rename is
+refused before anything changes.
+
+### Wrap a switch as another domain
+
+```bash
+ha-tool wrap-entity switch.desk_lamp --as light --name "Desk Lamp"
+ha-tool wrap-entity switch.vent --as fan -y
+```
+
+Creates a new `switch_as_x` entity backed by the source switch. Useful for
+re-creating switch→light / switch→fan mappings after an integration rebuild.
+
+### Inspect a device
+
+```bash
+ha-tool device-inspect "Kitchen Motion"   # name substring
+ha-tool device-inspect a1b2c3d4e5         # exact device_id
+```
+
+Device metadata plus its full entity roster. Ambiguous name matches list the
+candidates to pick from.
+
+### Report unhealthy entities
+
+```bash
+ha-tool stale-report
+ha-tool stale-report --stale 2d -d sensor
+ha-tool stale-report --only unavailable --only orphaned
+```
+
+Read-only sweep flagging `unavailable`, `unknown`, `stale`, `restored`,
+`orphaned`, `disabled`, and `hidden` entities. Change-only sensors can
+false-positive on `stale`, so treat that flag as advisory.
 
 ### Removal commands
 

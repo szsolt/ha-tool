@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-11
+
 ### Added
 
 - `set-entity`: edit entity registry fields (name, entity_id, area, labels, icon, device_class, disabled/hidden, entity_category) live via config/entity_registry/update.
@@ -15,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `device-inspect`: device-centric view (metadata + full entity roster) resolved by device_id or name substring.
 - `wrap-entity`: create a switch_as_x wrapped entity (switch -> light/fan/cover/lock/siren/valve) with an optional name.
 - `rename-entity` — Change an entity's `entity_id` in the entity registry (via `config/entity_registry/update` with `new_entity_id`). Works for integration-provided entities since the override is keyed by unique_id; handy after an integration rebuild re-assigns entity_ids and existing templates/config still point at the old ones.
+- Test suite (pytest) — the repo previously had none. CI now runs it on 3.12 and 3.13.
+- Shell completion (`--install-completion` / `--show-completion`) and rich `--help` rendering.
+- Pre-commit hook (`scripts/check-docs.sh`) gating command documentation, ruff, and mypy.
+
+### Changed
+
+- CLI migrated from Click to Typer. The command surface is unchanged.
 
 ## [0.3.0] - 2026-06-17
 

@@ -50,12 +50,31 @@ def index() -> EntityIndex:
         },
     ]
     entity_entries = [
-        {"entity_id": "switch.office_fan_l1", "platform": "mqtt", "device_id": "dev_fan"},
-        {"entity_id": "switch.office_fan_l2", "platform": "mqtt", "device_id": "dev_fan"},
-        {"entity_id": "sensor.office_fan_rssi", "platform": "mqtt", "device_id": "dev_fan"},
-        {"entity_id": "sensor.bedroom_temp", "platform": "mqtt", "device_id": "dev_bed"},
+        {
+            "entity_id": "switch.office_fan_l1",
+            "platform": "mqtt",
+            "device_id": "dev_fan",
+        },
+        {
+            "entity_id": "switch.office_fan_l2",
+            "platform": "mqtt",
+            "device_id": "dev_fan",
+        },
+        {
+            "entity_id": "sensor.office_fan_rssi",
+            "platform": "mqtt",
+            "device_id": "dev_fan",
+        },
+        {
+            "entity_id": "sensor.bedroom_temp",
+            "platform": "mqtt",
+            "device_id": "dev_bed",
+        },
         {"entity_id": "sensor.old_meter", "platform": "mqtt"},
-        {"entity_id": "light.ghost", "platform": "hue"},  # registry-only, no state -> orphaned
+        {
+            "entity_id": "light.ghost",
+            "platform": "hue",
+        },  # registry-only, no state -> orphaned
         {"entity_id": "switch.disabled_one", "platform": "mqtt", "disabled_by": "user"},
         {"entity_id": "switch.hidden_one", "platform": "mqtt", "hidden_by": "user"},
     ]
