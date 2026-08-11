@@ -1,5 +1,6 @@
 # ha-tool
 
+[![PyPI](https://img.shields.io/pypi/v/ha-tool.svg)](https://pypi.org/project/ha-tool/)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -19,14 +20,15 @@ A CLI tool for discovering, querying, and controlling Home Assistant over WebSoc
 ## Installation
 
 ```bash
-# From PyPI (when published)
+# As a standalone CLI (recommended)
+uv tool install ha-tool
+
+# Or with pip
 pip install ha-tool
 
 # From source
-pip install -e .
-
-# With uv
 uv tool install .
+pip install -e .
 ```
 
 ## Configuration
