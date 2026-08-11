@@ -65,7 +65,7 @@ class HAWebSocketClient:
         except (OSError, TimeoutError) as e:
             raise ConnectionError(
                 f"Cannot connect to {self._url}: {e}\n"
-                f"Check that HASS_URL is correct and Home Assistant is reachable."
+                f"Check that HASS_SERVER is correct and Home Assistant is reachable."
             ) from e
 
         await self._authenticate()

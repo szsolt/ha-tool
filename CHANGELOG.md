@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Connection-failure message told users to check `HASS_URL`, but `HASS_SERVER`
+  is the primary variable (`HASS_URL` is only a fallback). Anyone who had set
+  `HASS_SERVER` was pointed at the wrong thing.
+
+### Changed
+
+- README's "For AI Agents" section now documents the agent-facing contract
+  explicitly: JSON on every command, stdout kept clean, meaningful exit codes,
+  and which commands read vs. write.
+
 ## [0.4.1] - 2026-08-11
 
 ### Fixed

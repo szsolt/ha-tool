@@ -356,7 +356,24 @@ ha-tool -v search "pool"
 
 ## For AI Agents
 
-The installable skill at [`skills/ha-tool.md`](skills/ha-tool.md) is structured documentation optimized for AI agent consumption, including:
+`ha-tool` is built to be driven by an LLM agent, not just a human:
+
+- **`-o json` on every command** — structured output, no scraping of table
+  text. (`watch` is the exception: it streams NDJSON unconditionally.)
+- **stdout stays clean.** Diagnostics and progress go to stderr, so piping into
+  `jq` (or straight into a model) never picks up stray banners.
+- **Meaningful exit codes** — non-zero on connection failure, auth failure, and
+  validation errors, so an agent can branch on success instead of parsing prose.
+- **Stateless** — no daemon or session to manage. One invocation, one result.
+- **A clear read-only subset.** Discovery and inspection (`search`, `get`,
+  `inspect`, `areas`, `history`, `stale-report`, `device-inspect`, `verify`, …)
+  never write. The rest — `call`, `reload`, `restart`, `set-entity`,
+  `rename-entity`, `wrap-entity`, `lovelace-refresh`, `remove-*` — change
+  state, so an agent can be given the safe subset explicitly.
+  `bulk-rename` is dry-run unless you pass `--apply`.
+
+The installable skill at [`skills/ha-tool.md`](skills/ha-tool.md) is structured
+documentation optimized for agent consumption, including:
 - Command reference with exact output schemas
 - Discovery workflow patterns
 - Common usage examples
