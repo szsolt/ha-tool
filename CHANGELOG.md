@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-08-11
+
+### Fixed
+
+- Documentation still described the CLI as Click-based after the migration to Typer. The "adding a new command" recipe in `CLAUDE.md` was actively wrong — it referenced `@cli.command()` and `ctx.obj["output"]`, neither of which exists any more.
+- README install instructions now lead with `uv tool install ha-tool` and no longer say the package is unpublished.
+
 ## [0.4.0] - 2026-08-11
 
 ### Added
