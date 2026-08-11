@@ -11,8 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- README documented `verify -m` for missing-only output; the flag is `--filter missing` (`-m` was removed when `--missing-only` became `--filter`). The example errored out as written.
 - Documentation still described the CLI as Click-based after the migration to Typer. The "adding a new command" recipe in `CLAUDE.md` was actively wrong — it referenced `@cli.command()` and `ctx.obj["output"]`, neither of which exists any more.
 - README install instructions now lead with `uv tool install ha-tool` and no longer say the package is unpublished.
+- `bulk.py` and `timeparse.py` were missing from the module listings in `CLAUDE.md` and `CONTRIBUTING.md`.
+
+### Added
+
+- `check-docs.sh` now parse-checks every `ha-tool` example in the docs against the real CLI, and CI runs it. This is what caught the `verify -m` error; stale examples previously went unnoticed until a user hit them.
 
 ## [0.4.0] - 2026-08-11
 

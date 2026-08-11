@@ -52,3 +52,6 @@ jobs:
 
       - name: Run tests
         run: pytest -q
+
+      - name: Check documented examples parse
+        run: ./scripts/check-docs.sh --docs-only

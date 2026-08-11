@@ -23,6 +23,8 @@ ha-tool -o json search "kitchen"
 - `ha_tool/client.py` — `HAWebSocketClient` async context manager for HA WebSocket API
 - `ha_tool/models.py` — Pydantic models for entities, areas, devices, services
 - `ha_tool/registry.py` — `EntityIndex` class for searching/filtering entities
+- `ha_tool/bulk.py` — regex entity_id remapping for `bulk-rename` (collision/no-op/cross-domain classification)
+- `ha_tool/timeparse.py` — `--since`/`--until` parsing (`1h`, `2d`, `today`, `now`, ISO 8601)
 
 ## Key Patterns
 

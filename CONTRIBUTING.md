@@ -72,7 +72,9 @@ ha-tool/
 │   ├── cli.py        # Typer CLI commands
 │   ├── client.py     # WebSocket client
 │   ├── models.py     # Pydantic models
-│   └── registry.py   # Entity index and search logic
+│   ├── registry.py   # Entity index and search logic
+│   ├── bulk.py       # Regex entity_id remapping for bulk-rename
+│   └── timeparse.py  # --since/--until time parsing
 ├── AGENTS.md         # AI agent documentation
 ├── README.md
 ├── pyproject.toml

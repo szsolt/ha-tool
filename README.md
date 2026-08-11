@@ -176,7 +176,7 @@ ha-tool verify automations.yaml
 ha-tool verify automations.yaml scripts.yaml configuration.yaml
 
 # Only show missing/invalid references
-ha-tool verify -m automations.yaml
+ha-tool verify --filter missing automations.yaml
 ```
 
 Extracts all patterns matching `<known_domain>.<object_id>` from the given files, filters out known service names (e.g. `light.turn_on`), and checks each entity against the live HA instance.
