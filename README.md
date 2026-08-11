@@ -348,7 +348,7 @@ This copies the skill to `~/.claude/commands/ha-tool.md`, making it available gl
 ## Dependencies
 
 - Python 3.12+
-- [click](https://click.palletsprojects.com/) — CLI framework
+- [typer](https://typer.tiangolo.com/) — CLI framework
 - [pydantic](https://docs.pydantic.dev/) — Data validation
 - [websockets](https://websockets.readthedocs.io/) — WebSocket client
 

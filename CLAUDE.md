@@ -19,7 +19,7 @@ ha-tool -o json search "kitchen"
 
 ## Code Structure
 
-- `ha_tool/cli.py` — Click CLI commands, entry point is `main()`
+- `ha_tool/cli.py` — Typer CLI commands, entry point is `main()`
 - `ha_tool/client.py` — `HAWebSocketClient` async context manager for HA WebSocket API
 - `ha_tool/models.py` — Pydantic models for entities, areas, devices, services
 - `ha_tool/registry.py` — `EntityIndex` class for searching/filtering entities
@@ -29,7 +29,7 @@ ha-tool -o json search "kitchen"
 ### Adding a new command
 
 1. Add client method to `client.py` if it needs new WebSocket calls
-2. Add CLI command in `cli.py` using `@cli.command()` decorator
+2. Add CLI command in `cli.py` using the `@app.command()` decorator, with options declared as `Annotated[T, typer.Option(...)]` parameters
 3. Use `run_with_error_handling()` wrapper for async calls
 4. Support both human (`output_table`) and JSON (`output_json`) output
 5. Update `skills/ha-tool.md` (installable skill — source of truth for CLI usage docs) and add a `CHANGELOG.md` entry
@@ -47,8 +47,10 @@ For subscription-based APIs (like `render_template`), use `asyncio.Queue` instea
 
 ### Output formats
 
+Global flags live on the module-level `state` object, set by the Typer callback:
+
 ```python
-if ctx.obj["output"] == "json":
+if state.output == OutputFormat.json:
     output_json([r.model_dump(exclude_none=True) for r in results])
 else:
     output_table(rows, ["col1", "col2", "col3"])
@@ -56,7 +58,13 @@ else:
 
 ## Testing
 
-No test suite yet. Test manually against a real HA instance:
+Unit tests cover the pure helpers (no HA connection needed):
+
+```bash
+uv run pytest
+```
+
+Anything touching the WebSocket API still needs manual testing against a real instance:
 
 ```bash
 export HASS_SERVER=https://your-ha:8123
@@ -72,7 +80,7 @@ ha-tool call light.turn_on --target '{"entity_id": "light.test"}'
 
 - Python 3.12+, type hints everywhere
 - Pydantic v2 for models
-- Click for CLI
+- Typer for CLI
 - No comments unless explaining non-obvious logic
 - Prefer `model_dump()` over `dict()` for Pydantic models
 

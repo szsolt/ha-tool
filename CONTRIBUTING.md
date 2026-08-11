@@ -69,7 +69,7 @@ mypy ha_tool
 ha-tool/
 ├── ha_tool/
 │   ├── __init__.py
-│   ├── cli.py        # Click CLI commands
+│   ├── cli.py        # Typer CLI commands
 │   ├── client.py     # WebSocket client
 │   ├── models.py     # Pydantic models
 │   └── registry.py   # Entity index and search logic
