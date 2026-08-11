@@ -69,18 +69,21 @@ fi
 echo "Checking documented examples parse..."
 # Needs the package importable, so run it in the project env like the linters.
 run_tool python - <<'PY' || fail=1
-import os, pathlib, re, shlex, sys
+import os, pathlib, re, shlex, subprocess, sys
 
-os.environ.update(HASS_SERVER="http://127.0.0.1:1", HASS_TOKEN="x",
-                  NO_COLOR="1", COLUMNS="200")
+# Drive the installed console script rather than importing a test runner:
+# typer >=0.27 vendors its CLI layer and no longer depends on click, so
+# click.testing/typer.testing are absent from a plain `pip install -e .`.
+env = dict(os.environ, HASS_SERVER="http://127.0.0.1:1", HASS_TOKEN="x",
+           NO_COLOR="1", COLUMNS="200")
+runner = [sys.executable, "-c", "from ha_tool.cli import app; app()"]
 
-from click.testing import CliRunner  # noqa: E402  (installed via typer)
-from typer.main import get_command  # noqa: E402
+probe = subprocess.run([*runner, "--help"], capture_output=True, text=True, env=env)
+if probe.returncode != 0:
+    print("  - cannot run the CLI; is the package installed?")
+    print((probe.stdout + probe.stderr).strip()[:400])
+    sys.exit(1)
 
-from ha_tool.cli import app  # noqa: E402
-
-cmd = get_command(app)
-runner = CliRunner()
 bad = 0
 for doc in ("README.md", "skills/ha-tool.md", "AGENTS.md", "CONTRIBUTING.md", "CLAUDE.md"):
     p = pathlib.Path(doc)
@@ -97,8 +100,9 @@ for doc in ("README.md", "skills/ha-tool.md", "AGENTS.md", "CONTRIBUTING.md", "C
                 continue
             # --help short-circuits before any network call, so this checks the
             # command name and flag names without contacting Home Assistant.
-            result = runner.invoke(cmd, [*args, "--help"])
-            text = result.output
+            result = subprocess.run([*runner, *args, "--help"],
+                                    capture_output=True, text=True, env=env)
+            text = result.stdout + result.stderr
             if any(m in text for m in ("No such command", "No such option", "Got unexpected")):
                 detail = " ".join(
                     l.strip() for l in text.splitlines()
