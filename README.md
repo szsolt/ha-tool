@@ -6,6 +6,22 @@
 
 A CLI tool for discovering, querying, and controlling Home Assistant over WebSocket. Designed for both human use and AI agent consumption.
 
+```console
+$ ha-tool search "pool" -d sensor
+ENTITY_ID                FRIENDLY_NAME     STATE  AREA
+───────────────────────  ────────────────  ─────  ────
+sensor.pool_temperature  Pool Temperature  27.4   Pool
+sensor.pool_ph           Pool pH           7.2    Pool
+
+(2 results)
+
+$ ha-tool -o json get sensor.pool_temperature | jq .state
+"27.4"
+```
+
+Every command speaks `-o json`, so it composes with `jq` and is easy for an
+agent to consume.
+
 ## Features
 
 - **Entity Discovery** — Search, inspect, and list entities with flexible filtering
@@ -209,6 +225,12 @@ PATTERN is a Python regex `fullmatch`ed against each entity_id; REPLACEMENT
 supports backrefs. A batch containing any collision or cross-domain rename is
 refused before anything changes.
 
+> [!IMPORTANT]
+> Renaming an entity_id does **not** update references to it. Automations,
+> scripts, scenes, dashboards, and templates still pointing at the old id will
+> silently stop working. Review the dry-run output before `--apply`, and use
+> `ha-tool verify` afterwards to catch stale references in your YAML.
+
 ### Wrap a switch as another domain
 
 ```bash
@@ -243,13 +265,19 @@ false-positive on `stale`, so treat that flag as advisory.
 
 ### Removal commands
 
+> [!WARNING]
+> These permanently modify your Home Assistant registry. Removing a config
+> entry also removes every entity that integration provided. There is no undo
+> — restore from a backup. Take one first.
+
 ```bash
-ha-tool remove-entity input_boolean.test_toggle -y
-ha-tool remove-device <device_id> <config_entry_id> -y
-ha-tool remove-config-entry <entry_id> -y
+ha-tool remove-entity input_boolean.test_toggle
+ha-tool remove-device <device_id> <config_entry_id>
+ha-tool remove-config-entry <entry_id>
 ```
 
-Registry cleanup. Prompts for confirmation unless `-y` / `--yes`.
+Registry cleanup. Each prompts for confirmation; pass `-y` / `--yes` to skip
+the prompt in scripts.
 
 ### Validate config
 

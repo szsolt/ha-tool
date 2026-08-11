@@ -92,6 +92,11 @@ for doc in ("README.md", "skills/ha-tool.md", "AGENTS.md", "CONTRIBUTING.md", "C
     for block in re.findall(r"```(?:bash|sh|console)?\n(.*?)```", p.read_text(), re.S):
         for line in block.splitlines():
             line = line.strip()
+            # ```console blocks prefix commands with a shell prompt.
+            if line.startswith("$ "):
+                line = line[2:].strip()
+            # Only check the ha-tool side of a pipeline; `| jq .state` is not ours.
+            line = line.split("|")[0].strip()
             if not line.startswith("ha-tool ") or "--help" in line:
                 continue
             try:
