@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `remove-config-entry` always failed with "Unknown command": HA has no
+  WebSocket command for it. It now deletes the entry over REST.
+
 - Connection-failure message told users to check `HASS_URL`, but `HASS_SERVER`
   is the primary variable (`HASS_URL` is only a fallback). Anyone who had set
   `HASS_SERVER` was pointed at the wrong thing.

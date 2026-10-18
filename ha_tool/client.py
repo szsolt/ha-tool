@@ -260,7 +260,20 @@ class HAWebSocketClient:
         )
 
     async def remove_config_entry(self, entry_id: str) -> dict | None:
-        return await self.send_command("config_entries/remove", entry_id=entry_id)
+        """Delete a config entry via REST DELETE: the WebSocket API has no
+        command for it (config_entries/remove is "Unknown command")."""
+
+        def _do() -> dict | None:
+            status, parsed = self._rest_json(
+                "DELETE", f"/api/config/config_entries/entry/{entry_id}"
+            )
+            if status != 200:
+                raise RuntimeError(
+                    f"Failed to remove config entry '{entry_id}' (HTTP {status}): {parsed}"
+                )
+            return parsed if isinstance(parsed, dict) else None
+
+        return await asyncio.to_thread(_do)
 
     def _rest_json(self, method: str, path: str, body: dict | None = None) -> tuple[int, Any]:
         """Synchronous REST call returning (status_code, parsed_json).
