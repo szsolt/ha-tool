@@ -1,3 +1,5 @@
+<img src="https://raw.githubusercontent.com/szsolt/ha-tool/master/assets/logo.png" alt="ha-tool logo" width="128">
+
 # ha-tool
 
 [![PyPI](https://img.shields.io/pypi/v/ha-tool.svg)](https://pypi.org/project/ha-tool/)
