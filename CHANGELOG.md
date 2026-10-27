@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Added `llms.txt` so AI search tools can find the docs. README headings now
+  name the task they solve.
+
 ## [0.4.2] - 2026-10-27
 
 ### Fixed

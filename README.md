@@ -184,7 +184,7 @@ ha-tool template '{{ now().strftime("%H:%M") }}'
 ha-tool template '{{ state_attr("climate.hvac", "current_temperature") }}'
 ```
 
-### Verify entity references in files
+### Find broken entity references in YAML files
 
 ```bash
 # Check all entity references in a file
@@ -214,7 +214,7 @@ ha-tool rename-entity switch.old_name switch.new_name
 Live edit via `config/entity_registry/update` — no restart. `--new-id` must stay
 in the same domain. `--label` is repeatable and replaces the whole label set.
 
-### Bulk rename by regex
+### Bulk rename Home Assistant entities by regex
 
 ```bash
 # Dry-run by default — prints every old -> new
@@ -233,7 +233,7 @@ refused before anything changes.
 > silently stop working. Review the dry-run output before `--apply`, and use
 > `ha-tool verify` afterwards to catch stale references in your YAML.
 
-### Wrap a switch as another domain
+### Show a switch as a light or fan
 
 ```bash
 ha-tool wrap-entity switch.desk_lamp --as light --name "Desk Lamp"
@@ -253,7 +253,7 @@ ha-tool device-inspect a1b2c3d4e5         # exact device_id
 Device metadata plus its full entity roster. Ambiguous name matches list the
 candidates to pick from.
 
-### Report unhealthy entities
+### Find unavailable, stale and orphaned entities
 
 ```bash
 ha-tool stale-report
@@ -356,7 +356,7 @@ ha-tool -v search "pool"
 - Disabled entities are excluded by default.
 - Search pattern auto-detection: plain text → substring, `*`/`?` → glob, regex metacharacters → regex.
 
-## For AI Agents
+## Use with AI agents (Claude Code, Cursor, Codex)
 
 `ha-tool` is built to be driven by an LLM agent, not just a human:
 

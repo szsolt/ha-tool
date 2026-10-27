@@ -1,0 +1,13 @@
+# ha-tool
+
+> Home Assistant CLI for discovering, querying and controlling entities over WebSocket. Built for humans and AI agents. Every command supports JSON output (`-o json`). Needs `HASS_SERVER` and `HASS_TOKEN` set. Install with `uv tool install ha-tool`, or run without installing via `uvx ha-tool`.
+
+## Docs
+
+- [Agent skill (command reference)](https://raw.githubusercontent.com/szsolt/ha-tool/master/skills/ha-tool.md): every command with exact JSON output shapes, discovery workflow and examples
+- [README](https://raw.githubusercontent.com/szsolt/ha-tool/master/README.md): install, configuration, usage per task, and which commands change state
+
+## Optional
+
+- [Changelog](https://raw.githubusercontent.com/szsolt/ha-tool/master/CHANGELOG.md)
+- [PyPI package](https://pypi.org/project/ha-tool/)
