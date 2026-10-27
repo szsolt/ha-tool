@@ -1,3 +1,8 @@
+---
+name: ha-tool
+description: Discover, query and control Home Assistant from the command line with the ha-tool CLI. Use when the user asks about Home Assistant entities, areas, devices, states, history, services or automations. Requires ha-tool installed (https://github.com/szsolt/ha-tool) and HASS_SERVER/HASS_TOKEN set.
+---
+
 # ha-tool — Home Assistant CLI
 
 Use `ha-tool` for discovering, querying, and controlling Home Assistant. Always use `-o json` for structured output.

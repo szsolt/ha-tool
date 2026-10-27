@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The skill file now has `name`/`description` frontmatter, so it installs as a
+  standard `SKILL.md` in Claude Code, Cursor and other agents.
+
 - README's "For AI Agents" section now documents the agent-facing contract
   explicitly: JSON on every command, stdout kept clean, meaningful exit codes,
   and which commands read vs. write.
