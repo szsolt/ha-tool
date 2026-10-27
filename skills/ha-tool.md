@@ -1,6 +1,6 @@
 ---
 name: ha-tool
-description: Discover, query and control Home Assistant from the command line with the ha-tool CLI. Use when the user asks about Home Assistant entities, areas, devices, states, history, services or automations. Requires ha-tool installed (https://github.com/szsolt/ha-tool) and HASS_SERVER/HASS_TOKEN set.
+description: Discover, query and control Home Assistant with the ha-tool CLI. Use when the user asks about Home Assistant entities, areas, devices, states, history, services or automations. Requires ha-tool (https://github.com/szsolt/ha-tool), or uv to run it via uvx, and HASS_SERVER/HASS_TOKEN set.
 ---
 
 # ha-tool — Home Assistant CLI
@@ -10,6 +10,9 @@ Use `ha-tool` for discovering, querying, and controlling Home Assistant. Always 
 ## Prerequisites
 
 Requires `HASS_SERVER` and `HASS_TOKEN` environment variables.
+
+If `ha-tool` is not on PATH, run it as `uvx ha-tool <args>` (or `pipx run ha-tool <args>`).
+Same arguments and output. To install it permanently: `uv tool install ha-tool`.
 
 ## Commands
 
