@@ -24,6 +24,8 @@ $ ha-tool -o json get sensor.pool_temperature | jq .state
 Every command speaks `-o json`, so it composes with `jq` and is easy for an
 agent to consume.
 
+![ha-tool searching sensors](https://raw.githubusercontent.com/szsolt/ha-tool/master/assets/screenshot.png)
+
 ## Features
 
 - **Entity Discovery** — Search, inspect, and list entities with flexible filtering
